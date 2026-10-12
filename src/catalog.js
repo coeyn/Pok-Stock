@@ -34,21 +34,22 @@ function simplify(card) {
   };
 }
 
-export async function searchCards({ name = '', number = '', total = '' }) {
+export async function searchCards({ name = '', number = '', total = '', visual = [] }) {
   name = name.trim(); number = number.trim();
-  if (!name && !number) return [];
+  if (!name && !number && !visual.length) return [];
   const queries = [];
   if (name) queries.push(new URLSearchParams({ name }));
   if (number) {
     queries.push(new URLSearchParams({ localId: number }));
     if (/^\d+$/.test(number)) queries.push(new URLSearchParams({ localId: String(Number(number)).padStart(3, '0') }));
   }
-  const responses = await Promise.all(queries.map(query => fetchJson(`${BASE}?${query}`)));
+  const responses = await Promise.all(queries.map(query => fetchJson(`${BASE}?${query}`).catch(() => [])));
   const brief = new Map(responses.flatMap(rows => rows.slice(0, 250)).map(card => [card.id, card]));
   if (!brief.size && name.includes(' ')) {
-    const rows = await fetchJson(`${BASE}?${new URLSearchParams({ name: name.split(' ')[0] })}`);
+    const rows = await fetchJson(`${BASE}?${new URLSearchParams({ name: name.split(' ')[0] })}`).catch(() => []);
     rows.slice(0, 250).forEach(card => brief.set(card.id, card));
   }
+  const visualById = new Map(visual.map(match => [match.id, match]));
   const score = card => {
     let result = 0;
     if (name) {
@@ -63,7 +64,15 @@ export async function searchCards({ name = '', number = '', total = '' }) {
     }
     return result;
   };
-  const top = [...brief.values()].sort((a, b) => score(b) - score(a)).slice(0, 12);
-  const details = await Promise.all(top.map(card => fetchJson(`${BASE}/${encodeURIComponent(card.id)}`).catch(() => null)));
-  return details.flatMap((card, index) => card ? [{ ...simplify(card), score: Math.round(score(top[index]) + (total && Number(total) === card.set?.cardCount?.official ? 35 : 0)) }] : []).sort((a, b) => b.score - a.score);
+  const textTop = [...brief.values()].sort((a, b) => score(b) - score(a)).slice(0, visual.length ? 8 : 12);
+  const ids = [...new Set([...visual.slice(0, 16).map(match => match.id), ...textTop.map(card => card.id)])];
+  const details = await Promise.all(ids.map(id => fetchJson(`${BASE}/${encodeURIComponent(id)}`).catch(() => null)));
+  const candidates = details.filter(Boolean).map(card => {
+    const match = visualById.get(card.id);
+    const visualScore = match ? Math.max(0, 145 - 3 * match.distance) : 0;
+    const totalScore = total && Number(total) === card.set?.cardCount?.official ? 35 : 0;
+    return { ...simplify(card), score: Math.round(score(card) + visualScore + totalScore), visual_distance: match?.distance ?? null };
+  });
+  if (!candidates.length) throw new Error('Impossible de joindre le catalogue TCGdex.');
+  return candidates.sort((a, b) => b.score - a.score).slice(0, 12);
 }

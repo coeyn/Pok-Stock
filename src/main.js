@@ -1,6 +1,8 @@
 import { createWorker } from 'tesseract.js';
 import { searchCards } from './catalog.js';
+import { readScan } from './recognition.js';
 import { addCard, deleteCard, exportBackup, exportCsv, importBackup, listCards, updateCard, validateCardmarketUrl } from './storage.js';
+import { visualMatches } from './visual.js';
 import './style.css';
 
 const app = document.querySelector('#app');
@@ -59,7 +61,7 @@ function addFiles(files) {
   const accepted = [...files].filter(f => ['image/jpeg','image/png','image/webp'].includes(f.type) && f.size <= 15_000_000);
   if(accepted.length < files.length) toast('Certains fichiers ont été ignorés (format ou taille).','error');
   const first = state.queue.length === 0;
-  state.queue.push(...accepted.map(file => ({file, url:URL.createObjectURL(file), name:'', number:'', total:'', analyzed:false})));
+  state.queue.push(...accepted.map(file => ({file, url:URL.createObjectURL(file), name:'', number:'', total:'', visual:[], analyzed:false})));
   if(accepted.length) {$('#scan-workspace').classList.remove('hidden'); if(first) state.current=0; renderQueue(); if(first) analyzeCurrent();}
 }
 function currentItem(){return state.queue[state.current]}
@@ -78,37 +80,22 @@ $('#prev-scan').onclick=()=>{saveInputs();state.current--;renderQueue();if(curre
 $('#next-scan').onclick=()=>{saveInputs();state.current++;renderQueue();if(currentItem().analyzed)findCards();else analyzeCurrent()};
 $('#clear-queue').onclick=()=>{state.queue.forEach(x=>URL.revokeObjectURL(x.url));state.queue=[];renderQueue()};
 
-async function crop(file, part){
-  const image=await createImageBitmap(file);
-  const canvas=document.createElement('canvas');
-  canvas.width=image.width;canvas.height=Math.round(image.height*(part==='top'?.27:.30));
-  const ctx=canvas.getContext('2d');ctx.fillStyle='white';ctx.fillRect(0,0,canvas.width,canvas.height);
-  const sy=part==='top'?0:image.height-canvas.height;
-  ctx.drawImage(image,0,sy,image.width,canvas.height,0,0,canvas.width,canvas.height);
-  image.close();return canvas;
-}
-function parseOcr(top,bottom){
-  const lines=top.split(/\r?\n/).map(s=>s.trim().replace(/\s+(?:PV|HP|n)?\s*\d{2,3}\s*%?.*$/i,'').trim()).filter(Boolean);
-  const name=lines.find(s=>/^[\p{L}][\p{L}\s.'’\-]{2,35}$/u.test(s) && !/^(pok[eé]mon|niveau|basic|stage|pv|hp)$/i.test(s))||'';
-  const numbers=[...bottom.matchAll(/\b([A-Z]{0,3}\d{1,4}|\d{1,4})\s*[\/\\]\s*(\d{1,4})\b/gi)];
-  const match=numbers.at(-1);return {name,number:match?.[1]||'',total:match?.[2]||''};
-}
 async function analyzeCurrent(){
   const item=currentItem();if(!item||item.analyzed||state.busy)return;
-  state.busy=true;$('#ocr-status').textContent='Lecture du scan en cours…';
+  state.busy=true;$('#ocr-status').textContent='Lecture du nom, du numéro et comparaison visuelle…';
   try{
-    if(!state.worker) state.worker=await createWorker('fra+eng');
-    const top=await crop(item.file,'top');const bottom=await crop(item.file,'bottom');
-    const topText=(await state.worker.recognize(top)).data.text;
-    const bottomText=(await state.worker.recognize(bottom)).data.text;
-    const parsed=parseOcr(topText,bottomText);Object.assign(item,parsed,{analyzed:true});
-    if(currentItem()===item){renderQueue(); if(item.name||item.number) await findCards(); else $('#ocr-status').textContent='Lecture incertaine · saisissez le nom ou le numéro';}
+    const visualPromise=visualMatches(item.file).catch(() => []);
+    let parsed={};
+    try {if(!state.worker) state.worker=await createWorker(['fra','eng']); parsed=await readScan(item.file,state.worker)}
+    catch(error) {toast(`Lecture du texte : ${error.message}`,'error')}
+    Object.assign(item,parsed,{visual:await visualPromise,analyzed:true});
+    if(currentItem()===item){renderQueue();if(item.name||item.number||item.visual.length) await findCards();else $('#ocr-status').textContent='Lecture incertaine · saisissez le nom ou le numéro';}
   }catch(e){if(currentItem()===item)$('#ocr-status').textContent='Lecture impossible · saisissez le nom ou le numéro';toast(`Reconnaissance : ${e.message}`,'error')}
-  finally{state.busy=false}
+  finally{state.busy=false;if(currentItem()&&!currentItem().analyzed)analyzeCurrent()}
 }
 async function findCards(){
   saveInputs();const item=currentItem();if(!item)return;
-  if(!item.name&&!item.number){toast('Saisissez un nom ou un numéro.','error');return}
+  if(!item.name&&!item.number&&!item.visual.length){toast('Saisissez un nom ou un numéro.','error');return}
   $('#find-card').disabled=true;$('#find-card').textContent='Recherche en cours…';
   try {state.candidates=await searchCards(item);renderCandidates();}
   catch(e){toast(e.message,'error')}
