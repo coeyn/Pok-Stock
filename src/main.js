@@ -7,7 +7,7 @@ import './style.css';
 import './compact.css';
 
 const app = document.querySelector('#app');
-const state = { queue: [], current: 0, candidates: [], selected: null, selectedCards: new Set(), cards: [], worker: null, busy: false };
+const state = { queue: [], current: 0, candidates: [], selected: null, selectedCards: new Set(), setFilter: null, cards: [], worker: null, busy: false };
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const euros = n => n == null ? '—' : new Intl.NumberFormat('fr-FR', {style:'currency', currency:'EUR'}).format(n);
@@ -39,6 +39,7 @@ app.innerHTML = `
       <section id="inventory-page" class="page hidden">
         <div class="page-heading"><div><div class="eyebrow">VOTRE COLLECTION</div><h1>Inventaire<span>.</span></h1><p>Retrouvez vos cartes, fixez votre prix et ouvrez leur page Cardmarket.</p></div><div class="heading-symbol">◈</div></div>
         <div class="stats"><div><small>CARTES EN STOCK</small><strong id="stat-count">0</strong></div><div><small>RÉFÉRENCES</small><strong id="stat-types">0</strong></div><div><small>VALEUR DEMANDÉE</small><strong id="stat-value">0 €</strong></div></div>
+        <section class="extension-overview" aria-label="Filtrer par extension"><div class="extension-heading"><div><h2>Extensions</h2><span id="extension-count"></span></div><small>Nombre de cartes · valeur des prix renseignés</small></div><div id="extension-list" class="extension-list"></div></section>
         <div class="inventory-toolbar"><input id="inventory-search" placeholder="Rechercher un nom, une série, un numéro…"><button id="export-csv" class="outline-button">↓ CSV</button><button id="export-backup" class="outline-button">↓ Sauvegarde</button><button id="import-backup" class="outline-button">↑ Restaurer</button><input id="backup-file" type="file" accept="application/json,.json" hidden></div>
         <div class="bulk-bar"><label class="select-visible"><input id="select-visible" type="checkbox"> Tout sélectionner</label><strong id="selection-count">0 sélectionnée</strong><div class="bulk-price"><label for="bulk-price">Prix commun</label><input id="bulk-price" type="number" min="0" step="0.01" placeholder="0,10"><span>€</span><button id="apply-bulk-price" class="primary-button" disabled>Appliquer</button></div><button id="clear-selection" class="text-button" disabled>Effacer la sélection</button></div>
         <div id="inventory-list" class="inventory-list"></div>
@@ -133,9 +134,9 @@ async function loadCards(){
 }
 function renderInventory(){
   const cards=state.cards;$('#nav-count').textContent=cards.reduce((s,c)=>s+c.quantity,0);$('#stat-count').textContent=cards.reduce((s,c)=>s+c.quantity,0);$('#stat-types').textContent=new Set(cards.map(c=>c.tcgdex_id)).size;$('#stat-value').textContent=euros(cards.reduce((s,c)=>s+(c.price||0)*c.quantity,0));
-  const q=$('#inventory-search').value.toLocaleLowerCase();const visible=visibleInventoryCards();
+  const q=$('#inventory-search').value.toLocaleLowerCase();renderExtensionOverview();const visible=visibleInventoryCards();
   document.querySelectorAll('[data-scan-url]').forEach(img=>URL.revokeObjectURL(img.dataset.scanUrl));
-  $('#inventory-list').innerHTML=visible.length?visible.map(c=>`<article class="inventory-card${state.selectedCards.has(c.id)?' selected':''}"><label class="card-selector" title="Sélectionner ${esc(c.name)}"><input type="checkbox" data-select-card="${c.id}" ${state.selectedCards.has(c.id)?'checked':''}><span></span></label><img data-card-image="${c.id}" src="${esc(c.image_url)}" alt=""><div class="inventory-details"><strong>${esc(c.name)}</strong><small>${esc(c.set_name)} · N° ${esc(c.number)}</small><div class="tags"><span>${esc(c.variant||'Standard')}</span><span>${esc(c.condition)}</span><span>${esc(c.language)}</span><span>× ${c.quantity}</span></div></div><div class="inventory-price"><small>PRIX DE VENTE</small><strong>${euros(c.price)}</strong></div><div class="inventory-actions"><button data-cardmarket="${c.id}">Cardmarket ↗</button><button data-edit="${c.id}">Modifier</button></div></article>`).join(''):`<div class="empty-inventory"><div>◇</div><h3>${q?'Aucun résultat':'Votre inventaire attend ses premières cartes'}</h3><p>${q?'Essayez une autre recherche.':'Importez un scan pour commencer votre collection.'}</p><button id="go-scan" class="primary-button">Scanner une carte →</button></div>`;
+  $('#inventory-list').innerHTML=visible.length?visible.map(c=>`<article class="inventory-card${state.selectedCards.has(c.id)?' selected':''}"><label class="card-selector" title="Sélectionner ${esc(c.name)}"><input type="checkbox" data-select-card="${c.id}" ${state.selectedCards.has(c.id)?'checked':''}><span></span></label><img data-card-image="${c.id}" src="${esc(c.image_url)}" alt=""><div class="inventory-details"><strong>${esc(c.name)}</strong><small>${esc(c.set_name)} · N° ${esc(c.number)}</small><div class="tags"><span>${esc(c.variant||'Standard')}</span><span>${esc(c.condition)}</span><span>${esc(c.language)}</span><span>× ${c.quantity}</span></div></div><div class="inventory-price"><small>PRIX DE VENTE</small><strong>${euros(c.price)}</strong></div><div class="inventory-actions"><button data-cardmarket="${c.id}">Cardmarket ↗</button><button data-edit="${c.id}">Modifier</button></div></article>`).join(''):`<div class="empty-inventory"><div>◇</div><h3>${q||state.setFilter?'Aucun résultat':'Votre inventaire attend ses premières cartes'}</h3><p>${q||state.setFilter?'Essayez une autre recherche ou choisissez une autre extension.':'Importez un scan pour commencer votre collection.'}</p><button id="go-scan" class="primary-button">Scanner une carte →</button></div>`;
   visible.forEach(c=>{if(c.scan){const img=document.querySelector(`[data-card-image="${c.id}"]`);const url=URL.createObjectURL(c.scan);img.src=url;img.dataset.scanUrl=url}});
   document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>openEdit(Number(b.dataset.edit)));
   document.querySelectorAll('[data-select-card]').forEach(input=>input.onchange=()=>{const id=Number(input.dataset.selectCard);input.checked?state.selectedCards.add(id):state.selectedCards.delete(id);input.closest('.inventory-card').classList.toggle('selected',input.checked);updateBulkControls(visible)});
@@ -143,7 +144,16 @@ function renderInventory(){
   $('#go-scan')?.addEventListener('click',()=>showPage('scan'));
   updateBulkControls(visible);
 }
-function visibleInventoryCards(){const q=$('#inventory-search').value.toLocaleLowerCase();return state.cards.filter(c=>`${c.name} ${c.set_name} ${c.number}`.toLocaleLowerCase().includes(q))}
+function renderExtensionOverview(){
+  const groups=new Map();
+  for(const card of state.cards){const name=card.set_name||'Sans extension';if(!groups.has(name))groups.set(name,{name,count:0,value:0,unpriced:0});const group=groups.get(name);group.count+=Number(card.quantity)||0;if(card.price==null)group.unpriced+=Number(card.quantity)||0;else group.value+=Number(card.price)*(Number(card.quantity)||0)}
+  const total={count:0,value:0,unpriced:0};for(const group of groups.values()){total.count+=group.count;total.value+=group.value;total.unpriced+=group.unpriced}
+  $('#extension-count').textContent=`${groups.size} extension${groups.size===1?'':'s'}`;
+  const row=(name,group,all=false)=>`<button class="extension-option${(all?state.setFilter===null:state.setFilter===name)?' active':''}" data-extension="${all?'*':esc(name)}" aria-pressed="${all?state.setFilter===null:state.setFilter===name}"><span class="extension-option-name">${esc(name)}</span><span class="extension-option-meta">${group.count} carte${group.count===1?'':'s'}${group.unpriced?` · ${group.unpriced} sans prix`:''}</span><strong>${euros(group.value)}</strong></button>`;
+  $('#extension-list').innerHTML=row('Toutes les extensions',total,true)+[...groups.values()].sort((a,b)=>a.name.localeCompare(b.name,'fr')).map(group=>row(group.name,group)).join('');
+  document.querySelectorAll('[data-extension]').forEach(button=>button.onclick=()=>{const next=button.dataset.extension==='*'?null:button.dataset.extension;if(next!==state.setFilter){state.setFilter=next;state.selectedCards.clear()}renderInventory()});
+}
+function visibleInventoryCards(){const q=$('#inventory-search').value.toLocaleLowerCase();return state.cards.filter(c=>(state.setFilter===null||(c.set_name||'Sans extension')===state.setFilter)&&`${c.name} ${c.set_name} ${c.number}`.toLocaleLowerCase().includes(q))}
 function updateBulkControls(visible=visibleInventoryCards()){
   const count=state.selectedCards.size,selectedVisible=visible.filter(c=>state.selectedCards.has(c.id)).length;
   $('#selection-count').textContent=`${count} sélectionnée${count>1?'s':''}`;
