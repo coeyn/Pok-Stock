@@ -46,7 +46,7 @@ export async function addCard(card, scan) {
         && same(row.language) === same(card.language));
       if (existing) {
         const quantity = (Number(existing.quantity) || 1) + (Number(card.quantity) || 1);
-        store.put({ ...existing, quantity });
+        store.put({ ...existing, ...(card.price == null ? {} : { price: Number(card.price) }), quantity });
         outcome = { merged: true, quantity };
       } else {
         const add = store.add({ ...card, scan, created_at: new Date().toISOString() });

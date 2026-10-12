@@ -38,7 +38,7 @@
 .compact-page .confirmation { margin-top: 12px; padding: 13px; }
 .compact-confirm {
   display: grid;
-  grid-template-columns: minmax(150px, 1.4fr) minmax(120px, 1fr) 75px 75px 64px auto;
+  grid-template-columns: minmax(150px, 1.4fr) minmax(120px, 1fr) 75px 75px 64px 110px auto;
   align-items: end;
   gap: 10px;
 }

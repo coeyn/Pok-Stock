@@ -136,15 +136,17 @@ function selectCandidate(index){
   state.selected=state.candidates[index];const c=state.selected;
   document.querySelectorAll('.candidate').forEach((el,i)=>el.classList.toggle('chosen',i===index));
   $('#confirmation').classList.remove('hidden');
-  $('#confirmation').innerHTML=`<div class="compact-confirm"><div class="confirm-card"><strong>${esc(c.name)}</strong><span>${esc(c.set)} · N° ${esc(c.number)}</span></div><label>Variante<select id="new-variant">${c.variants.map((v,i)=>`<option value="${i}">${esc(v.label)}</option>`).join('')}</select></label><label>État<select id="new-condition"><option>NM</option><option>MT</option><option>EX</option><option>GD</option><option>LP</option><option>PL</option><option>PO</option></select></label><label>Langue<select id="new-language"><option>FR</option><option>EN</option><option>DE</option><option>ES</option><option>IT</option><option>JP</option></select></label><label>Qté<input id="new-quantity" type="number" min="1" value="1"></label><button id="save-card" class="primary-button">Ajouter <span>↗</span></button></div>`;
+  $('#confirmation').innerHTML=`<div class="compact-confirm"><div class="confirm-card"><strong>${esc(c.name)}</strong><span>${esc(c.set)} · N° ${esc(c.number)}</span></div><label>Variante<select id="new-variant">${c.variants.map((v,i)=>`<option value="${i}">${esc(v.label)}</option>`).join('')}</select></label><label>État<select id="new-condition"><option>NM</option><option>MT</option><option>EX</option><option>GD</option><option>LP</option><option>PL</option><option>PO</option></select></label><label>Langue<select id="new-language"><option>FR</option><option>EN</option><option>DE</option><option>ES</option><option>IT</option><option>JP</option></select></label><label>Qté<input id="new-quantity" type="number" min="1" value="1"></label><label>Prix unitaire (€)<input id="new-price" type="number" min="0" step="0.01" placeholder="À définir"></label><button id="save-card" class="primary-button">Ajouter <span>↗</span></button></div>`;
   c.cardmarketPromise=getCardmarketUrl(c.id,c).then(url=>{c.cardmarket_url=url;return url}).catch(()=>null);
   $('#save-card').onclick=saveCard;$('#confirmation').scrollIntoView({behavior:'smooth',block:'start'});
 }
 async function saveCard(){
   const c=state.selected,item=currentItem(),v=c.variants[Number($('#new-variant').value)];
+  const priceInput=$('#new-price').value;
+  if(priceInput!==''&&(!Number.isFinite(Number(priceInput))||Number(priceInput)<0)){toast('Saisissez un prix unitaire valide.','error');$('#new-price').focus();return}
   $('#save-card').disabled=true;
   const cardmarketUrl=await c.cardmarketPromise;
-  const payload={tcgdex_id:c.id,name:c.name,set_name:c.set,number:c.number,image_url:c.image,variant:v.label,price:null,quantity:Number($('#new-quantity').value),condition:$('#new-condition').value,language:$('#new-language').value,cardmarket_url:cardmarketUrl,notes:''};
+  const payload={tcgdex_id:c.id,name:c.name,set_name:c.set,number:c.number,image_url:c.image,variant:v.label,price:priceInput===''?null:Number(priceInput),quantity:Number($('#new-quantity').value),condition:$('#new-condition').value,language:$('#new-language').value,cardmarket_url:cardmarketUrl,notes:''};
   try{validateCardmarketUrl(payload.cardmarket_url);const result=await addCard(payload,item.file);toast(result.merged?`${c.name} regroupé · quantité totale : ${result.quantity}`:`${c.name} ajouté à l'inventaire`);URL.revokeObjectURL(item.url);state.queue.splice(state.current,1);state.current=Math.min(state.current,state.queue.length-1);renderQueue();if(state.queue.length)analyzeCurrent();loadCards();}
   catch(e){toast(e.message,'error');$('#save-card').disabled=false}
 }
