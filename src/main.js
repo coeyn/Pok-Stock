@@ -1,5 +1,5 @@
 import { createWorker } from 'tesseract.js';
-import { getCardmarketUrl, searchCards } from './catalog.js';
+import { getCardmarketUrl, listSets, searchCards } from './catalog.js';
 import { readScan } from './recognition.js';
 import { addCard, deleteCard, exportBackup, exportCsv, importBackup, listCards, updateCard, updateCards, validateCardmarketUrl } from './storage.js';
 import { visualMatches } from './visual.js';
@@ -7,7 +7,7 @@ import './style.css';
 import './compact.css';
 
 const app = document.querySelector('#app');
-const state = { queue: [], current: 0, candidates: [], selected: null, selectedCards: new Set(), setFilter: null, cards: [], worker: null, busy: false };
+const state = { queue: [], current: 0, candidates: [], selected: null, selectedCards: new Set(), setFilter: null, scanSet: localStorage.getItem('scan-set') || '', cards: [], worker: null, busy: false };
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const euros = n => n == null ? '—' : new Intl.NumberFormat('fr-FR', {style:'currency', currency:'EUR'}).format(n);
@@ -27,6 +27,7 @@ app.innerHTML = `
       <header class="topbar"><div class="breadcrumb">Collection <span>/</span> <strong id="breadcrumb-current">Scanner</strong></div><div class="top-right">Pokémon TCG <span class="dot"></span> FR</div></header>
       <section id="scan-page" class="page compact-page">
         <div class="page-heading compact-heading"><div><div class="eyebrow">SCAN RAPIDE</div><h1>Scanner vos cartes<span>.</span></h1></div><div class="heading-symbol">✳</div></div>
+        <div class="scan-set-picker"><label for="scan-set">Extension des cartes</label><select id="scan-set"><option value="">Toutes les extensions</option></select><small id="scan-set-status">Choisissez une extension pour limiter les résultats du scanner.</small></div>
         <div id="dropzone" class="dropzone compact-dropzone"><input id="file-input" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden><div class="upload-icon">↥</div><div><h2>Ajouter des scans</h2><p>Déposez ou choisissez plusieurs photos · JPG, PNG, WEBP</p></div></div>
         <div id="scan-workspace" class="scan-workspace hidden">
           <div class="workspace-head"><div><div class="eyebrow">EN COURS D'IDENTIFICATION</div><h2 id="queue-title">Carte 1</h2></div><div class="queue-actions"><span id="queue-count"></span><button id="clear-queue" class="text-button">Vider la file</button></div></div>
@@ -58,6 +59,13 @@ dropzone.ondragover = e => {e.preventDefault(); dropzone.classList.add('dragging
 dropzone.ondragleave = () => dropzone.classList.remove('dragging');
 dropzone.ondrop = e => {e.preventDefault(); dropzone.classList.remove('dragging'); addFiles(e.dataTransfer.files)};
 $('#file-input').onchange = e => {addFiles(e.target.files); e.target.value=''};
+
+async function loadScanSets(){
+  const select=$('#scan-set'),status=$('#scan-set-status');
+  try{const sets=await listSets();select.insertAdjacentHTML('beforeend',sets.map(set=>`<option value="${esc(set.id)}">${esc(set.name)}</option>`).join(''));if(sets.some(set=>set.id===state.scanSet))select.value=state.scanSet;else state.scanSet='';status.textContent=`${sets.length} extensions disponibles · le choix reste mémorisé dans ce navigateur.`}
+  catch{status.textContent='Extensions indisponibles · vous pouvez scanner sans filtre.'}
+}
+$('#scan-set').onchange=()=>{state.scanSet=$('#scan-set').value;localStorage.setItem('scan-set',state.scanSet);if(currentItem()?.analyzed&&(currentItem().name||currentItem().number||currentItem().visual.length))findCards()};
 
 function addFiles(files) {
   const accepted = [...files].filter(f => ['image/jpeg','image/png','image/webp'].includes(f.type) && f.size <= 15_000_000);
@@ -99,7 +107,7 @@ async function findCards(){
   saveInputs();const item=currentItem();if(!item)return;
   if(!item.name&&!item.number&&!item.visual.length){toast('Saisissez un nom ou un numéro.','error');return}
   $('#find-card').disabled=true;$('#find-card').textContent='Recherche en cours…';
-  try {state.candidates=await searchCards(item);renderCandidates();}
+  try {state.candidates=await searchCards({...item,setId:state.scanSet});renderCandidates();}
   catch(e){toast(e.message,'error')}
   finally{$('#find-card').disabled=false;$('#find-card').innerHTML='Rechercher la carte <span>↗</span>'}
 }
@@ -182,3 +190,4 @@ $('#export-backup').onclick=()=>exportBackup().catch(e=>toast(e.message,'error')
 $('#import-backup').onclick=()=>$('#backup-file').click();
 $('#backup-file').onchange=async e=>{const file=e.target.files[0];if(!file)return;if(!confirm('Restaurer cette sauvegarde ? Les cartes seront ajoutées à cet inventaire.'))return;try{const count=await importBackup(file);toast(`${count} carte${count>1?'s':''} restaurée${count>1?'s':''}`);loadCards()}catch(err){toast(err.message,'error')}finally{e.target.value=''}};
 loadCards();
+loadScanSets();

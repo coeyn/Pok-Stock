@@ -2,7 +2,9 @@ import { cardmarketUrl } from './storage.js';
 
 const BASE = 'https://api.tcgdex.net/v2/fr/cards';
 const EN_BASE = 'https://api.tcgdex.net/v2/en';
+const SETS_BASE = 'https://api.tcgdex.net/v2/fr/sets';
 const cardmarketLinks = new Map();
+let setsPromise;
 const norm = value => String(value || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
 function similarity(a, b) {
@@ -43,6 +45,11 @@ export function productUrl(card, set) {
   return `https://www.cardmarket.com/fr/Pokemon/Products/Singles/${slug(set.name)}/${slug(card.name)}-${slug(code)}${slug(card.localId)}?language=2`;
 }
 
+export function listSets() {
+  if (!setsPromise) setsPromise = fetchJson(SETS_BASE).then(rows => rows.map(set => ({id:set.id,name:set.name||set.id,series:set.serie?.name||''})).sort((a,b)=>a.name.localeCompare(b.name,'fr'))).catch(error=>{setsPromise=null;throw error});
+  return setsPromise;
+}
+
 export function getCardmarketUrl(id, fallback = {}) {
   if (!cardmarketLinks.has(id)) {
     const promise = (async () => {
@@ -57,7 +64,7 @@ export function getCardmarketUrl(id, fallback = {}) {
   return cardmarketLinks.get(id);
 }
 
-export async function searchCards({ name = '', number = '', total = '', visual = [] }) {
+export async function searchCards({ name = '', number = '', total = '', visual = [], setId = '' }) {
   name = name.trim(); number = number.trim();
   if (!name && !number && !visual.length) return [];
   const queries = [];
@@ -66,10 +73,12 @@ export async function searchCards({ name = '', number = '', total = '', visual =
     queries.push(new URLSearchParams({ localId: number }));
     if (/^\d+$/.test(number)) queries.push(new URLSearchParams({ localId: String(Number(number)).padStart(3, '0') }));
   }
+  if (setId) queries.forEach(query => query.set('set.id', setId));
   const responses = await Promise.all(queries.map(query => fetchJson(`${BASE}?${query}`).catch(() => [])));
   const brief = new Map(responses.flatMap(rows => rows.slice(0, 250)).map(card => [card.id, card]));
   if (!brief.size && name.includes(' ')) {
-    const rows = await fetchJson(`${BASE}?${new URLSearchParams({ name: name.split(' ')[0] })}`).catch(() => []);
+    const query = new URLSearchParams({ name: name.split(' ')[0] });if(setId)query.set('set.id',setId);
+    const rows = await fetchJson(`${BASE}?${query}`).catch(() => []);
     rows.slice(0, 250).forEach(card => brief.set(card.id, card));
   }
   const visualById = new Map(visual.map(match => [match.id, match]));
@@ -95,7 +104,7 @@ export async function searchCards({ name = '', number = '', total = '', visual =
     const visualScore = match ? Math.max(0, 145 - 3 * match.distance) : 0;
     const totalScore = total && Number(total) === card.set?.cardCount?.official ? 35 : 0;
     return { ...simplify(card), score: Math.round(score(card) + visualScore + totalScore), visual_distance: match?.distance ?? null };
-  });
-  if (!candidates.length) throw new Error('Impossible de joindre le catalogue TCGdex.');
+  }).filter(card => !setId || card.set?.id === setId);
+  if (!candidates.length) throw new Error(setId ? 'Aucune carte trouvée dans cette extension. Vérifiez le choix ou désactivez le filtre.' : 'Impossible de joindre le catalogue TCGdex.');
   return candidates.sort((a, b) => b.score - a.score).slice(0, 12);
 }

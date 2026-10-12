@@ -1,6 +1,10 @@
 .compact-page { padding-top: 26px; }
 .compact-heading { margin-bottom: 18px; }
 .compact-heading h1 { font-size: 34px; }
+.scan-set-picker { display: grid; grid-template-columns: auto minmax(220px, 360px); align-items: center; gap: 3px 12px; margin: 0 0 10px; }
+.scan-set-picker label { grid-row: 1 / span 2; color: #425447; font-size: 11px; font-weight: 600; }
+.scan-set-picker select { min-height: 35px; padding: 6px 10px; border: 1px solid #dce6da; border-radius: 7px; background: #fff; color: #34443a; font: inherit; font-size: 12px; }
+.scan-set-picker small { grid-column: 2; color: #78857a; font-size: 9px; }
 .compact-dropzone {
   min-height: 82px;
   flex-direction: row;
@@ -125,6 +129,9 @@
 @media (max-width: 650px) {
   .compact-page { padding-top: 20px; }
   .compact-heading { margin-bottom: 13px; }
+  .scan-set-picker { grid-template-columns: 1fr; gap: 5px; }
+  .scan-set-picker label, .scan-set-picker small { grid-column: 1; grid-row: auto; }
+  .scan-set-picker select { width: 100%; }
   .compact-dropzone { min-height: 70px; padding: 12px; }
   .compact-page .workspace-grid { grid-template-columns: 1fr; }
   .compact-page .scan-preview > img { max-height: 215px; }
