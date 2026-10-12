@@ -45,6 +45,10 @@ export function productUrl(card, set) {
   return `https://www.cardmarket.com/fr/Pokemon/Products/Singles/${slug(set.name)}/${slug(card.name)}-${slug(code)}${slug(card.localId)}?language=2`;
 }
 
+export function productIdUrl(productId) {
+  return productId ? `https://www.cardmarket.com/fr/Pokemon/Products?idProduct=${encodeURIComponent(productId)}&language=2` : null;
+}
+
 export function listSets() {
   if (!setsPromise) setsPromise = fetchJson(SETS_BASE).then(rows => rows.map(set => ({id:set.id,name:set.name||set.id,series:set.serie?.name||''})).sort((a,b)=>a.name.localeCompare(b.name,'fr'))).catch(error=>{setsPromise=null;throw error});
   return setsPromise;
@@ -55,9 +59,9 @@ export function getCardmarketUrl(id, fallback = {}) {
     const promise = (async () => {
       const card = await fetchJson(`${EN_BASE}/cards/${encodeURIComponent(id)}`);
       const set = await fetchJson(`${EN_BASE}/sets/${encodeURIComponent(card.set.id)}`).catch(() => null);
-      return productUrl(card, set) || (card.pricing?.cardmarket?.idProduct
-        ? `https://www.cardmarket.com/fr/Pokemon/Products?idProduct=${card.pricing.cardmarket.idProduct}&language=2`
-        : cardmarketUrl(fallback.name || card.name, fallback.number || card.localId));
+      const productId = card.thirdParty?.cardmarket || card.pricing?.cardmarket?.idProduct;
+      if (productId) return productIdUrl(productId);
+      return productUrl(card, set) || cardmarketUrl(fallback.name || card.name, fallback.number || card.localId);
     })().catch(error => { cardmarketLinks.delete(id); throw error; });
     cardmarketLinks.set(id, promise);
   }
