@@ -1,0 +1,113 @@
+.compact-page { padding-top: 26px; }
+.compact-heading { margin-bottom: 18px; }
+.compact-heading h1 { font-size: 34px; }
+.compact-dropzone {
+  min-height: 82px;
+  flex-direction: row;
+  gap: 14px;
+  padding: 14px 20px;
+  text-align: left;
+}
+.compact-dropzone .upload-icon { width: 42px; height: 42px; margin: 0; font-size: 25px; }
+.compact-dropzone h2 { font-size: 17px; }
+.compact-dropzone p { margin: 3px 0 0; }
+.compact-page .scan-workspace { margin-top: 16px; padding: 18px; }
+.compact-page .workspace-head { margin-bottom: 14px; }
+.compact-page .workspace-head h2 { font-size: 18px; }
+.compact-page .workspace-grid { grid-template-columns: minmax(170px, 230px) 1fr; gap: 18px; }
+.compact-page .scan-preview { padding: 10px; }
+.compact-page .scan-preview > img { max-height: 245px; }
+.compact-page .scan-file { margin: 6px 0; }
+.compact-page .recognition-fields {
+  grid-template-columns: 2fr 1fr 1fr auto;
+  align-items: end;
+  gap: 10px;
+}
+.compact-page .recognition-fields label:first-child { grid-column: auto; }
+.compact-page .recognition .primary-button { width: auto; margin: 0; }
+.compact-page .status-line { margin-bottom: 12px; padding: 9px 11px; }
+.compact-page .results { margin-top: 18px; padding-top: 17px; }
+.compact-page .section-title { margin-bottom: 12px; }
+.compact-page .section-title h3 { font-size: 18px; }
+.compact-page .candidate { padding: 7px; }
+.compact-page .candidate img { width: 41px; height: 57px; }
+.compact-page .confirmation { margin-top: 12px; padding: 13px; }
+.compact-confirm {
+  display: grid;
+  grid-template-columns: minmax(150px, 1.4fr) minmax(120px, 1fr) 75px 75px 64px auto;
+  align-items: end;
+  gap: 10px;
+}
+.confirm-card { align-self: center; min-width: 0; }
+.confirm-card strong {
+  display: block;
+  overflow: hidden;
+  font: 600 16px Outfit;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.confirm-card span { display: block; margin-top: 3px; color: #829083; font-size: 10px; }
+.compact-confirm .primary-button { min-height: 39px; }
+
+.bulk-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 14px;
+  padding: 10px 13px;
+  border: 1px solid #d8e7d5;
+  border-radius: 9px;
+  background: #eef5eb;
+}
+.select-visible { flex-direction: row; align-items: center; gap: 8px; white-space: nowrap; }
+.select-visible input, .card-selector input {
+  width: 16px;
+  height: 16px;
+  min-height: 0;
+  accent-color: #347647;
+}
+.bulk-bar > strong { color: #4e7257; font-size: 11px; white-space: nowrap; }
+.bulk-price { display: flex; align-items: center; gap: 7px; margin-left: auto; }
+.bulk-price label { font-size: 10px; white-space: nowrap; }
+.bulk-price input { width: 82px; min-height: 34px; padding: 7px 9px; }
+.bulk-price span { color: #607164; font-size: 12px; }
+.bulk-price .primary-button { min-height: 34px; padding: 8px 13px; }
+.inventory-card { position: relative; }
+.inventory-card.selected {
+  border-color: #69a56e;
+  background: #f5fbf3;
+  box-shadow: 0 0 0 1px #a8cfa8;
+}
+.card-selector { display: grid; align-self: stretch; place-items: center; cursor: pointer; }
+.card-selector span { display: none; }
+
+@media (max-width: 1000px) {
+  .compact-page .recognition-fields { grid-template-columns: 2fr 1fr; }
+  .compact-confirm { grid-template-columns: repeat(3, 1fr); }
+  .confirm-card { grid-column: span 2; }
+  .bulk-bar { flex-wrap: wrap; }
+  .bulk-price { order: 3; width: 100%; margin-left: 0; }
+}
+
+@media (max-width: 650px) {
+  .compact-page { padding-top: 20px; }
+  .compact-heading { margin-bottom: 13px; }
+  .compact-dropzone { min-height: 70px; padding: 12px; }
+  .compact-page .workspace-grid { grid-template-columns: 1fr; }
+  .compact-page .scan-preview > img { max-height: 215px; }
+  .compact-page .candidate-grid { grid-template-columns: 1fr; }
+  .compact-confirm { grid-template-columns: repeat(2, 1fr); }
+  .confirm-card { grid-column: span 2; }
+  .compact-confirm .primary-button { width: 100%; }
+  .bulk-price { flex-wrap: wrap; }
+  .bulk-price .primary-button { flex: 1; }
+  .card-selector {
+    position: absolute;
+    z-index: 1;
+    top: 10px;
+    left: 10px;
+    padding: 5px;
+    border-radius: 5px;
+    background: white;
+  }
+}

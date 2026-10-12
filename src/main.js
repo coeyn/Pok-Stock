@@ -1,12 +1,13 @@
 import { createWorker } from 'tesseract.js';
 import { getCardmarketUrl, searchCards } from './catalog.js';
 import { readScan } from './recognition.js';
-import { addCard, deleteCard, exportBackup, exportCsv, importBackup, listCards, updateCard, validateCardmarketUrl } from './storage.js';
+import { addCard, deleteCard, exportBackup, exportCsv, importBackup, listCards, updateCard, updateCards, validateCardmarketUrl } from './storage.js';
 import { visualMatches } from './visual.js';
 import './style.css';
+import './compact.css';
 
 const app = document.querySelector('#app');
-const state = { queue: [], current: 0, candidates: [], selected: null, cards: [], worker: null, busy: false };
+const state = { queue: [], current: 0, candidates: [], selected: null, selectedCards: new Set(), cards: [], worker: null, busy: false };
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const euros = n => n == null ? '—' : new Intl.NumberFormat('fr-FR', {style:'currency', currency:'EUR'}).format(n);
@@ -24,14 +25,13 @@ app.innerHTML = `
     </aside>
     <main class="main">
       <header class="topbar"><div class="breadcrumb">Collection <span>/</span> <strong id="breadcrumb-current">Scanner</strong></div><div class="top-right">Pokémon TCG <span class="dot"></span> FR</div></header>
-      <section id="scan-page" class="page">
-        <div class="page-heading"><div><div class="eyebrow">ESPACE DE TRAVAIL</div><h1>Scanner vos cartes<span>.</span></h1><p>Importez vos photos, vérifiez la correspondance et ajoutez chaque carte à votre inventaire.</p></div><div class="heading-symbol">✳</div></div>
-        <div class="step-strip"><div><i>01</i> Importer</div><span>→</span><div><i>02</i> Identifier</div><span>→</span><div><i>03</i> Enregistrer</div></div>
-        <div id="dropzone" class="dropzone"><input id="file-input" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden><div class="upload-icon">↥</div><h2>Déposez vos scans ici</h2><p>ou cliquez pour choisir plusieurs photos</p><div class="file-types">JPG, PNG, WEBP · 15 Mo max par image</div></div>
+      <section id="scan-page" class="page compact-page">
+        <div class="page-heading compact-heading"><div><div class="eyebrow">SCAN RAPIDE</div><h1>Scanner vos cartes<span>.</span></h1></div><div class="heading-symbol">✳</div></div>
+        <div id="dropzone" class="dropzone compact-dropzone"><input id="file-input" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden><div class="upload-icon">↥</div><div><h2>Ajouter des scans</h2><p>Déposez ou choisissez plusieurs photos · JPG, PNG, WEBP</p></div></div>
         <div id="scan-workspace" class="scan-workspace hidden">
           <div class="workspace-head"><div><div class="eyebrow">EN COURS D'IDENTIFICATION</div><h2 id="queue-title">Carte 1</h2></div><div class="queue-actions"><span id="queue-count"></span><button id="clear-queue" class="text-button">Vider la file</button></div></div>
           <div class="workspace-grid"><div class="scan-preview"><img id="scan-image" alt="Scan de la carte"><div class="scan-file" id="scan-file"></div><div class="queue-nav"><button id="prev-scan">← Précédente</button><button id="next-scan">Suivante →</button></div></div>
-            <div class="recognition"><div id="ocr-status" class="status-line">Prêt à analyser</div><div class="recognition-fields"><label>Nom lu sur la carte<input id="search-name" placeholder="Ex. Pikachu"></label><label>Numéro de collection<input id="search-number" placeholder="Ex. 025"></label><label>Total de la série (facultatif)<input id="search-total" inputmode="numeric" placeholder="Ex. 102"></label></div><button id="find-card" class="primary-button">Rechercher la carte <span>↗</span></button><p class="hint">La reconnaissance suggère des résultats. Vérifiez l'extension, le numéro et la variante avant l'ajout.</p></div></div>
+            <div class="recognition"><div id="ocr-status" class="status-line">Prêt à analyser</div><div class="recognition-fields"><label>Nom<input id="search-name" placeholder="Pikachu"></label><label>Numéro<input id="search-number" placeholder="025"></label><label>Total<input id="search-total" inputmode="numeric" placeholder="102"></label><button id="find-card" class="primary-button">Rechercher <span>↗</span></button></div></div></div>
           <div id="results" class="results"></div>
           <div id="confirmation" class="confirmation hidden"></div>
         </div>
@@ -40,6 +40,7 @@ app.innerHTML = `
         <div class="page-heading"><div><div class="eyebrow">VOTRE COLLECTION</div><h1>Inventaire<span>.</span></h1><p>Retrouvez vos cartes, fixez votre prix et ouvrez leur page Cardmarket.</p></div><div class="heading-symbol">◈</div></div>
         <div class="stats"><div><small>CARTES EN STOCK</small><strong id="stat-count">0</strong></div><div><small>RÉFÉRENCES</small><strong id="stat-types">0</strong></div><div><small>VALEUR DEMANDÉE</small><strong id="stat-value">0 €</strong></div></div>
         <div class="inventory-toolbar"><input id="inventory-search" placeholder="Rechercher un nom, une série, un numéro…"><button id="export-csv" class="outline-button">↓ CSV</button><button id="export-backup" class="outline-button">↓ Sauvegarde</button><button id="import-backup" class="outline-button">↑ Restaurer</button><input id="backup-file" type="file" accept="application/json,.json" hidden></div>
+        <div class="bulk-bar"><label class="select-visible"><input id="select-visible" type="checkbox"> Tout sélectionner</label><strong id="selection-count">0 sélectionnée</strong><div class="bulk-price"><label for="bulk-price">Prix commun</label><input id="bulk-price" type="number" min="0" step="0.01" placeholder="0,10"><span>€</span><button id="apply-bulk-price" class="primary-button" disabled>Appliquer</button></div><button id="clear-selection" class="text-button" disabled>Effacer la sélection</button></div>
         <div id="inventory-list" class="inventory-list"></div>
       </section>
     </main>
@@ -104,42 +105,62 @@ async function findCards(){
 $('#find-card').onclick=findCards;
 function renderCandidates(){
   $('#confirmation').classList.add('hidden');state.selected=null;
-  $('#results').innerHTML=`<div class="section-title"><div><div class="eyebrow">CATALOGUE TCGDEX</div><h3>Correspondances proposées</h3></div><span>${state.candidates.length} résultat${state.candidates.length>1?'s':''}</span></div>`+
-    (state.candidates.length?`<div class="candidate-grid">${state.candidates.map((c,i)=>`<button class="candidate" data-index="${i}"><img src="${esc(c.image)}" alt="" loading="lazy"><div><strong>${esc(c.name)}</strong><small>${esc(c.set)}</small><span>N° ${esc(c.number)}${c.set_total?' / '+c.set_total:''}</span></div><b>Choisir →</b></button>`).join('')}</div>`:'<div class="empty-result">Aucune correspondance. Essayez avec le nom exact ou le numéro de la carte.</div>');
+  const shown=state.candidates.slice(0,6);
+  $('#results').innerHTML=`<div class="section-title"><h3>Choisissez la bonne carte</h3><span>${shown.length} propositions</span></div>`+
+    (shown.length?`<div class="candidate-grid">${shown.map((c,i)=>`<button class="candidate" data-index="${i}"><img src="${esc(c.image)}" alt="" loading="lazy"><div><strong>${esc(c.name)}</strong><small>${esc(c.set)}</small><span>N° ${esc(c.number)}${c.set_total?' / '+c.set_total:''}</span></div><b>Choisir →</b></button>`).join('')}</div>`:'<div class="empty-result">Aucune correspondance. Corrigez le nom ou le numéro.</div>');
   document.querySelectorAll('.candidate').forEach(el=>el.onclick=()=>selectCandidate(Number(el.dataset.index)));
 }
 function selectCandidate(index){
   state.selected=state.candidates[index];const c=state.selected;
   document.querySelectorAll('.candidate').forEach((el,i)=>el.classList.toggle('chosen',i===index));
   $('#confirmation').classList.remove('hidden');
-  $('#confirmation').innerHTML=`<div class="section-title"><div><div class="eyebrow">DERNIÈRE ÉTAPE</div><h3>Ajouter à l'inventaire</h3></div><span>${esc(c.name)} · ${esc(c.number)}</span></div><div class="form-grid"><label>Variante<select id="new-variant">${c.variants.map((v,i)=>`<option value="${i}">${esc(v.label)}${v.product_id?' · Cardmarket #'+v.product_id:''}</option>`).join('')}</select></label><label>Prix de vente (€)<input id="new-price" type="number" min="0" step="0.01" placeholder="À définir plus tard"></label><label>État<select id="new-condition"><option>NM</option><option>MT</option><option>EX</option><option>GD</option><option>LP</option><option>PL</option><option>PO</option></select></label><label>Langue<select id="new-language"><option>FR</option><option>EN</option><option>DE</option><option>ES</option><option>IT</option><option>JP</option></select></label><label>Quantité<input id="new-quantity" type="number" min="1" value="1"></label><label class="wide">Notes<input id="new-notes" placeholder="Facultatif"></label></div><div class="confirm-footer"><p><a id="new-cardmarket-link" class="cardmarket-button" target="_blank" rel="noopener noreferrer" aria-disabled="true">Chargement du lien Cardmarket…</a></p><button id="save-card" class="primary-button">Ajouter cette carte <span>↗</span></button></div>`;
-  c.cardmarketPromise=getCardmarketUrl(c.id,c).then(url=>{c.cardmarket_url=url;if(state.selected===c){const link=$('#new-cardmarket-link');link.href=url;link.textContent='Voir sur Cardmarket ↗';link.removeAttribute('aria-disabled')}return url}).catch(error=>{if(state.selected===c){const link=$('#new-cardmarket-link');link.textContent='Lien Cardmarket indisponible';toast(error.message,'error')}return null});
+  $('#confirmation').innerHTML=`<div class="compact-confirm"><div class="confirm-card"><strong>${esc(c.name)}</strong><span>${esc(c.set)} · N° ${esc(c.number)}</span></div><label>Variante<select id="new-variant">${c.variants.map((v,i)=>`<option value="${i}">${esc(v.label)}</option>`).join('')}</select></label><label>État<select id="new-condition"><option>NM</option><option>MT</option><option>EX</option><option>GD</option><option>LP</option><option>PL</option><option>PO</option></select></label><label>Langue<select id="new-language"><option>FR</option><option>EN</option><option>DE</option><option>ES</option><option>IT</option><option>JP</option></select></label><label>Qté<input id="new-quantity" type="number" min="1" value="1"></label><button id="save-card" class="primary-button">Ajouter <span>↗</span></button></div>`;
+  c.cardmarketPromise=getCardmarketUrl(c.id,c).then(url=>{c.cardmarket_url=url;return url}).catch(()=>null);
   $('#save-card').onclick=saveCard;$('#confirmation').scrollIntoView({behavior:'smooth',block:'start'});
 }
 async function saveCard(){
   const c=state.selected,item=currentItem(),v=c.variants[Number($('#new-variant').value)];
-  const price=$('#new-price').value;
   $('#save-card').disabled=true;
   const cardmarketUrl=await c.cardmarketPromise;
-  const payload={tcgdex_id:c.id,name:c.name,set_name:c.set,number:c.number,image_url:c.image,variant:v.label,price:price===''?null:Number(price),quantity:Number($('#new-quantity').value),condition:$('#new-condition').value,language:$('#new-language').value,cardmarket_url:cardmarketUrl,notes:$('#new-notes').value};
+  const payload={tcgdex_id:c.id,name:c.name,set_name:c.set,number:c.number,image_url:c.image,variant:v.label,price:null,quantity:Number($('#new-quantity').value),condition:$('#new-condition').value,language:$('#new-language').value,cardmarket_url:cardmarketUrl,notes:''};
   try{validateCardmarketUrl(payload.cardmarket_url);await addCard(payload,item.file);toast(`${c.name} ajouté à l'inventaire`);URL.revokeObjectURL(item.url);state.queue.splice(state.current,1);state.current=Math.min(state.current,state.queue.length-1);renderQueue();if(state.queue.length)analyzeCurrent();loadCards();}
   catch(e){toast(e.message,'error');$('#save-card').disabled=false}
 }
 
 async function loadCards(){
-  try{state.cards=await listCards();renderInventory()}
+  try{state.cards=await listCards();const ids=new Set(state.cards.map(c=>c.id));state.selectedCards=new Set([...state.selectedCards].filter(id=>ids.has(id)));renderInventory()}
   catch(e){toast(e.message,'error')}
 }
 function renderInventory(){
   const cards=state.cards;$('#nav-count').textContent=cards.reduce((s,c)=>s+c.quantity,0);$('#stat-count').textContent=cards.reduce((s,c)=>s+c.quantity,0);$('#stat-types').textContent=new Set(cards.map(c=>c.tcgdex_id)).size;$('#stat-value').textContent=euros(cards.reduce((s,c)=>s+(c.price||0)*c.quantity,0));
-  const q=$('#inventory-search').value.toLocaleLowerCase();const visible=cards.filter(c=>`${c.name} ${c.set_name} ${c.number}`.toLocaleLowerCase().includes(q));
+  const q=$('#inventory-search').value.toLocaleLowerCase();const visible=visibleInventoryCards();
   document.querySelectorAll('[data-scan-url]').forEach(img=>URL.revokeObjectURL(img.dataset.scanUrl));
-  $('#inventory-list').innerHTML=visible.length?visible.map(c=>`<article class="inventory-card"><img data-card-image="${c.id}" src="${esc(c.image_url)}" alt=""><div class="inventory-details"><strong>${esc(c.name)}</strong><small>${esc(c.set_name)} · N° ${esc(c.number)}</small><div class="tags"><span>${esc(c.variant||'Standard')}</span><span>${esc(c.condition)}</span><span>${esc(c.language)}</span><span>× ${c.quantity}</span></div></div><div class="inventory-price"><small>PRIX DE VENTE</small><strong>${euros(c.price)}</strong></div><div class="inventory-actions"><button data-cardmarket="${c.id}">Cardmarket ↗</button><button data-edit="${c.id}">Modifier</button></div></article>`).join(''):`<div class="empty-inventory"><div>◇</div><h3>${q?'Aucun résultat':'Votre inventaire attend ses premières cartes'}</h3><p>${q?'Essayez une autre recherche.':'Importez un scan pour commencer votre collection.'}</p><button id="go-scan" class="primary-button">Scanner une carte →</button></div>`;
+  $('#inventory-list').innerHTML=visible.length?visible.map(c=>`<article class="inventory-card${state.selectedCards.has(c.id)?' selected':''}"><label class="card-selector" title="Sélectionner ${esc(c.name)}"><input type="checkbox" data-select-card="${c.id}" ${state.selectedCards.has(c.id)?'checked':''}><span></span></label><img data-card-image="${c.id}" src="${esc(c.image_url)}" alt=""><div class="inventory-details"><strong>${esc(c.name)}</strong><small>${esc(c.set_name)} · N° ${esc(c.number)}</small><div class="tags"><span>${esc(c.variant||'Standard')}</span><span>${esc(c.condition)}</span><span>${esc(c.language)}</span><span>× ${c.quantity}</span></div></div><div class="inventory-price"><small>PRIX DE VENTE</small><strong>${euros(c.price)}</strong></div><div class="inventory-actions"><button data-cardmarket="${c.id}">Cardmarket ↗</button><button data-edit="${c.id}">Modifier</button></div></article>`).join(''):`<div class="empty-inventory"><div>◇</div><h3>${q?'Aucun résultat':'Votre inventaire attend ses premières cartes'}</h3><p>${q?'Essayez une autre recherche.':'Importez un scan pour commencer votre collection.'}</p><button id="go-scan" class="primary-button">Scanner une carte →</button></div>`;
   visible.forEach(c=>{if(c.scan){const img=document.querySelector(`[data-card-image="${c.id}"]`);const url=URL.createObjectURL(c.scan);img.src=url;img.dataset.scanUrl=url}});
   document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>openEdit(Number(b.dataset.edit)));
+  document.querySelectorAll('[data-select-card]').forEach(input=>input.onchange=()=>{const id=Number(input.dataset.selectCard);input.checked?state.selectedCards.add(id):state.selectedCards.delete(id);input.closest('.inventory-card').classList.toggle('selected',input.checked);updateBulkControls(visible)});
   document.querySelectorAll('[data-cardmarket]').forEach(b=>b.onclick=async()=>{const card=state.cards.find(c=>c.id===Number(b.dataset.cardmarket));const tab=window.open('', '_blank');if(!tab){toast('Autorisez les fenêtres pop-up pour ouvrir Cardmarket.','error');return}try{const url=card.cardmarket_url&&!card.cardmarket_url.includes('searchString=')?card.cardmarket_url:await getCardmarketUrl(card.tcgdex_id,card);validateCardmarketUrl(url);tab.location.href=url;if(url!==card.cardmarket_url){card.cardmarket_url=url;await updateCard(card.id,{cardmarket_url:url})}}catch(error){tab.close();toast(`Cardmarket : ${error.message}`,'error')}});
   $('#go-scan')?.addEventListener('click',()=>showPage('scan'));
+  updateBulkControls(visible);
 }
+function visibleInventoryCards(){const q=$('#inventory-search').value.toLocaleLowerCase();return state.cards.filter(c=>`${c.name} ${c.set_name} ${c.number}`.toLocaleLowerCase().includes(q))}
+function updateBulkControls(visible=visibleInventoryCards()){
+  const count=state.selectedCards.size,selectedVisible=visible.filter(c=>state.selectedCards.has(c.id)).length;
+  $('#selection-count').textContent=`${count} sélectionnée${count>1?'s':''}`;
+  $('#select-visible').checked=visible.length>0&&selectedVisible===visible.length;
+  $('#select-visible').indeterminate=selectedVisible>0&&selectedVisible<visible.length;
+  $('#apply-bulk-price').disabled=count===0;
+  $('#clear-selection').disabled=count===0;
+}
+$('#select-visible').onchange=e=>{const visible=visibleInventoryCards();visible.forEach(c=>e.target.checked?state.selectedCards.add(c.id):state.selectedCards.delete(c.id));renderInventory()};
+$('#clear-selection').onclick=()=>{state.selectedCards.clear();renderInventory()};
+$('#apply-bulk-price').onclick=async()=>{
+  const input=$('#bulk-price'),price=Number(input.value);
+  if(input.value===''||!Number.isFinite(price)||price<0){toast('Saisissez un prix valide.','error');input.focus();return}
+  const ids=[...state.selectedCards];$('#apply-bulk-price').disabled=true;
+  try{await updateCards(ids,{price});toast(`Prix de ${euros(price)} appliqué à ${ids.length} carte${ids.length>1?'s':''}`);state.selectedCards.clear();input.value='';await loadCards()}
+  catch(error){toast(error.message,'error');updateBulkControls()}
+};
 $('#inventory-search').oninput=renderInventory;
 let editingId=null;
 function openEdit(id){const c=state.cards.find(c=>c.id===id);editingId=id;$('#edit-title').textContent=`${c.name} · ${c.number}`;const f=$('#edit-form');for(const k of ['quantity','condition','language','variant','notes'])f.elements[k].value=c[k]??'';f.elements.price.value=c.price??'';$('#edit-dialog').showModal()}

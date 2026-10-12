@@ -41,6 +41,27 @@ export async function updateCard(id, changes) {
   return operation('readwrite', store => store.put({ ...existing, ...changes, id }));
 }
 
+export async function updateCards(ids, changes) {
+  if (!ids.length) return 0;
+  const db = await database();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORE, 'readwrite');
+    const store = transaction.objectStore(STORE);
+    let updated = 0;
+    for (const id of ids) {
+      const request = store.get(id);
+      request.onsuccess = () => {
+        if (!request.result) return;
+        store.put({ ...request.result, ...changes, id });
+        updated++;
+      };
+    }
+    transaction.oncomplete = () => { db.close(); resolve(updated); };
+    transaction.onerror = () => { db.close(); reject(transaction.error); };
+    transaction.onabort = () => { db.close(); reject(transaction.error); };
+  });
+}
+
 export async function deleteCard(id) {
   return operation('readwrite', store => store.delete(id));
 }
