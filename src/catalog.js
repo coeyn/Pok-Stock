@@ -1,6 +1,8 @@
 import { cardmarketUrl } from './storage.js';
 
 const BASE = 'https://api.tcgdex.net/v2/fr/cards';
+const EN_BASE = 'https://api.tcgdex.net/v2/en';
+const cardmarketLinks = new Map();
 const norm = value => String(value || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
 function similarity(a, b) {
@@ -30,8 +32,29 @@ function simplify(card) {
     id: card.id, name: card.name || '', number: card.localId || '',
     set: card.set?.name || '', set_total: card.set?.cardCount?.official || null,
     image: card.image ? `${card.image}/high.webp` : '', variants,
-    cardmarket_search: cardmarketUrl(card.name || '', card.localId || ''),
   };
+}
+
+const slug = value => String(value || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/&/g, ' and ').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+export function productUrl(card, set) {
+  const code = set?.abbreviation?.official;
+  if (!card?.name || !set?.name || !code || !card.localId) return null;
+  return `https://www.cardmarket.com/fr/Pokemon/Products/Singles/${slug(set.name)}/${slug(card.name)}-${slug(code)}${slug(card.localId)}?language=2`;
+}
+
+export function getCardmarketUrl(id, fallback = {}) {
+  if (!cardmarketLinks.has(id)) {
+    const promise = (async () => {
+      const card = await fetchJson(`${EN_BASE}/cards/${encodeURIComponent(id)}`);
+      const set = await fetchJson(`${EN_BASE}/sets/${encodeURIComponent(card.set.id)}`).catch(() => null);
+      return productUrl(card, set) || (card.pricing?.cardmarket?.idProduct
+        ? `https://www.cardmarket.com/fr/Pokemon/Products?idProduct=${card.pricing.cardmarket.idProduct}&language=2`
+        : cardmarketUrl(fallback.name || card.name, fallback.number || card.localId));
+    })().catch(error => { cardmarketLinks.delete(id); throw error; });
+    cardmarketLinks.set(id, promise);
+  }
+  return cardmarketLinks.get(id);
 }
 
 export async function searchCards({ name = '', number = '', total = '', visual = [] }) {
