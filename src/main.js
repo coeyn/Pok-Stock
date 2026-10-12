@@ -145,7 +145,7 @@ async function saveCard(){
   $('#save-card').disabled=true;
   const cardmarketUrl=await c.cardmarketPromise;
   const payload={tcgdex_id:c.id,name:c.name,set_name:c.set,number:c.number,image_url:c.image,variant:v.label,price:null,quantity:Number($('#new-quantity').value),condition:$('#new-condition').value,language:$('#new-language').value,cardmarket_url:cardmarketUrl,notes:''};
-  try{validateCardmarketUrl(payload.cardmarket_url);await addCard(payload,item.file);toast(`${c.name} ajouté à l'inventaire`);URL.revokeObjectURL(item.url);state.queue.splice(state.current,1);state.current=Math.min(state.current,state.queue.length-1);renderQueue();if(state.queue.length)analyzeCurrent();loadCards();}
+  try{validateCardmarketUrl(payload.cardmarket_url);const result=await addCard(payload,item.file);toast(result.merged?`${c.name} regroupé · quantité totale : ${result.quantity}`:`${c.name} ajouté à l'inventaire`);URL.revokeObjectURL(item.url);state.queue.splice(state.current,1);state.current=Math.min(state.current,state.queue.length-1);renderQueue();if(state.queue.length)analyzeCurrent();loadCards();}
   catch(e){toast(e.message,'error');$('#save-card').disabled=false}
 }
 
@@ -174,7 +174,7 @@ function renderExtensionOverview(){
   $('#extension-list').innerHTML=row('Toutes les extensions',total,true)+[...groups.values()].sort((a,b)=>a.name.localeCompare(b.name,'fr')).map(group=>row(group.name,group)).join('');
   document.querySelectorAll('[data-extension]').forEach(button=>button.onclick=()=>{const next=button.dataset.extension==='*'?null:button.dataset.extension;if(next!==state.setFilter){state.setFilter=next;state.selectedCards.clear()}renderInventory()});
 }
-function visibleInventoryCards(){const q=$('#inventory-search').value.toLocaleLowerCase();return state.cards.filter(c=>(state.setFilter===null||(c.set_name||'Sans extension')===state.setFilter)&&`${c.name} ${c.set_name} ${c.number}`.toLocaleLowerCase().includes(q))}
+function visibleInventoryCards(){const q=$('#inventory-search').value.toLocaleLowerCase();const cards=state.cards.filter(c=>(state.setFilter===null||(c.set_name||'Sans extension')===state.setFilter)&&`${c.name} ${c.set_name} ${c.number}`.toLocaleLowerCase().includes(q));if(state.setFilter!==null)cards.sort((a,b)=>String(a.number||'').localeCompare(String(b.number||''),'fr',{numeric:true,sensitivity:'base'})||a.name.localeCompare(b.name,'fr'));return cards}
 function updateBulkControls(visible=visibleInventoryCards()){
   const count=state.selectedCards.size,selectedVisible=visible.filter(c=>state.selectedCards.has(c.id)).length;
   $('#selection-count').textContent=`${count} sélectionnée${count>1?'s':''}`;

@@ -32,7 +32,31 @@ export async function listCards() {
 }
 
 export async function addCard(card, scan) {
-  return operation('readwrite', store => store.add({ ...card, scan, created_at: new Date().toISOString() }));
+  const db = await database();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORE, 'readwrite');
+    const store = transaction.objectStore(STORE);
+    let outcome;
+    const request = store.getAll();
+    request.onsuccess = () => {
+      const same = value => String(value ?? '').trim().toLocaleLowerCase();
+      const existing = request.result.find(row => row.tcgdex_id === card.tcgdex_id
+        && same(row.variant || 'Standard') === same(card.variant || 'Standard')
+        && same(row.condition) === same(card.condition)
+        && same(row.language) === same(card.language));
+      if (existing) {
+        const quantity = (Number(existing.quantity) || 1) + (Number(card.quantity) || 1);
+        store.put({ ...existing, quantity });
+        outcome = { merged: true, quantity };
+      } else {
+        const add = store.add({ ...card, scan, created_at: new Date().toISOString() });
+        add.onsuccess = () => { outcome = { merged: false, quantity: Number(card.quantity) || 1 }; };
+      }
+    };
+    transaction.oncomplete = () => { db.close(); resolve(outcome); };
+    transaction.onerror = () => { db.close(); reject(transaction.error); };
+    transaction.onabort = () => { db.close(); reject(transaction.error); };
+  });
 }
 
 export async function updateCard(id, changes) {
