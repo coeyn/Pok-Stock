@@ -2,12 +2,14 @@ import { PSM } from 'tesseract.js';
 
 function cleanName(text) {
   const lines = text.split(/\r?\n/).map(line => line
+    .replace(/^\s*(?:(?:NIVEAU|NIV\.?)[\s-]*\d+|BASE|DRESSEUR|TRAINER|OBJET|SUPPORTER|STADE|ÉNERGIE|ENERGIE)\s*[:·-]?\s*/i, '')
+    .replace(/^\s*(?:(?:DRESSEUR|TRAINER|OBJET|SUPPORTER|STADE)\s*[:·-]?\s*)+/i, '')
     .replace(/\b(?:PV|HP|niv\.?|niveau)\s*\d{1,3}.*/gi, '')
     .replace(/\s+\d{2,3}\s*(?:PV|HP)?\b.*$/i, '')
     .replace(/[^\p{L}\p{N}'’\- ]/gu, ' ')
     .replace(/\s+/g, ' ').trim())
     .filter(Boolean);
-  const noise = /^(?:base|basic|niveau|evolution|évolution|pokemon|pokémon|pv|hp|stage|illus)$/i;
+  const noise = /^(?:base|basic|niveau|evolution|évolution|pokemon|pokémon|pv|hp|stage|illus|dresseur|trainer|objet|supporter|stade|énergie|energie)$/i;
   const useful = lines.filter(line => !noise.test(line) && /\p{L}{3}/u.test(line));
   if (!useful.length) return '';
   const first = useful[0].split(' ').filter(word => word.length > 1 || /^[VvXx]$/.test(word));
@@ -22,7 +24,7 @@ function readNumber(text) {
   return { number: match?.[1] || '', total: match?.[2] || '' };
 }
 
-async function cropAndEnhance(image, [x0, y0, x1, y1]) {
+async function cropAndEnhance(image, [x0, y0, x1, y1], { gamma = .82 } = {}) {
   const w = Math.max(1, Math.round((x1 - x0) * image.width));
   const h = Math.max(1, Math.round((y1 - y0) * image.height));
   const scale = Math.min(4, 2100 / w);
@@ -47,7 +49,8 @@ async function cropAndEnhance(image, [x0, y0, x1, y1]) {
   while (high > 0 && (count += histogram[high]) < threshold) high--;
   const gain = 255 / Math.max(1, high - low);
   for (let i = 0; i < gray.length; i++) {
-    const value = Math.max(0, Math.min(255, Math.round((gray[i] - low) * gain)));
+    const normalized = Math.max(0, Math.min(1, (gray[i] - low) * gain / 255));
+    const value = Math.max(0, Math.min(255, Math.round(Math.pow(normalized, gamma) * 255)));
     pixels[i * 4] = pixels[i * 4 + 1] = pixels[i * 4 + 2] = value;
   }
   ctx.putImageData(data, 0, 0);
@@ -58,18 +61,22 @@ export async function readScan(file, worker) {
   const image = await createImageBitmap(file);
   try {
     await worker.setParameters({ tessedit_pageseg_mode: PSM.SINGLE_LINE });
-    const header = await cropAndEnhance(image, [.17, .005, .78, .09]);
-    let name = cleanName((await worker.recognize(header)).data.text);
-    if (!name) {
-      const wider = await cropAndEnhance(image, [.10, .005, .88, .16]);
-      await worker.setParameters({ tessedit_pageseg_mode: PSM.SPARSE_TEXT });
-      name = cleanName((await worker.recognize(wider)).data.text);
+    const headerReads = [];
+    const headerBoxes = [[.12, .008, .97, .12], [.10, .045, .98, .18]];
+    for (let i = 0; i < headerBoxes.length; i++) {
+      if (i === 1) await worker.setParameters({ tessedit_pageseg_mode: PSM.SPARSE_TEXT });
+      const header = await cropAndEnhance(image, headerBoxes[i], { gamma: i === 0 ? .82 : .72 });
+      const result = (await worker.recognize(header)).data;
+      const candidate = cleanName(result.text);
+      if (candidate) headerReads.push({ name: candidate, confidence: result.confidence || 0 });
+      if (i === 0 && result.confidence >= 82 && candidate) break;
     }
+    const name = headerReads.sort((a, b) => (b.confidence + Math.min(b.name.length, 24) * .25) - (a.confidence + Math.min(a.name.length, 24) * .25))[0]?.name || '';
     await worker.setParameters({ tessedit_pageseg_mode: PSM.SPARSE_TEXT });
-    const numberCrop = await cropAndEnhance(image, [.10, .89, .46, .99]);
+    const numberCrop = await cropAndEnhance(image, [.08, .89, .48, .99], { gamma: .78 });
     let numbers = readNumber((await worker.recognize(numberCrop)).data.text);
     if (!numbers.number) {
-      const bottom = await cropAndEnhance(image, [0, .76, 1, 1]);
+      const bottom = await cropAndEnhance(image, [0, .76, 1, 1], { gamma: .72 });
       numbers = readNumber((await worker.recognize(bottom)).data.text);
     }
     return { name, ...numbers };
