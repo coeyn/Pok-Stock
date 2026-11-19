@@ -7,7 +7,7 @@ import './style.css';
 import './compact.css';
 
 const app = document.querySelector('#app');
-const state = { queue: [], current: 0, candidates: [], candidateIndex: 0, selected: null, selectedCards: new Set(), setFilter: null, scanSet: localStorage.getItem('scan-set') || '', scanSets: [], cards: [], worker: null, busy: false };
+const state = { queue: [], current: 0, candidates: [], candidateIndex: 0, selected: null, selectedCards: new Set(), setFilter: null, scanSet: localStorage.getItem('scan-set') || '', scanSets: [], cards: [], worker: null, busy: false, saving: false };
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const euros = n => n == null ? '—' : new Intl.NumberFormat('fr-FR', {style:'currency', currency:'EUR'}).format(n);
@@ -31,9 +31,8 @@ app.innerHTML = `
         <div id="dropzone" class="dropzone compact-dropzone"><input id="file-input" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden><div class="upload-icon">↥</div><div><h2>Ajouter des scans</h2><p>Déposez ou choisissez plusieurs photos · JPG, PNG, WEBP</p></div></div>
         <div id="scan-workspace" class="scan-workspace hidden">
           <div class="review-topbar"><span id="queue-title">1 / 1</span><span id="queue-count" class="visually-hidden"></span><button id="clear-queue" type="button" aria-label="Fermer le scanner">×</button></div>
-          <div class="recognition"><div id="ocr-status" class="status-line">Lecture…</div><div class="recognition-fields"><label>Nom<input id="search-name" placeholder="Nom"></label><label>Numéro<input id="search-number" placeholder="N°"></label><label>Total<input id="search-total" inputmode="numeric" placeholder="Total"></label><button id="find-card" class="primary-button">Rechercher</button></div></div>
+          <div class="recognition"><div id="ocr-status" class="status-line">Lecture…</div><div class="recognition-fields"><label>Nom<input id="search-name" placeholder="Nom"></label><label>Numéro<input id="search-number" placeholder="N°"></label><label>Total<input id="search-total" inputmode="numeric" placeholder="Total"></label><button id="find-card" class="primary-button">Rechercher</button></div><details class="scan-price-control"><summary>€ Prix unitaire</summary><input id="scan-price" type="number" min="0" step="0.01" placeholder="À définir"></details></div>
           <div class="swipe-review"><div class="scan-preview"><img id="scan-image" alt="Photo scannée de la carte"><div class="scan-file" id="scan-file"></div><div class="queue-nav"><button id="prev-scan" aria-label="Scan précédent">←</button><button id="next-scan" aria-label="Scan suivant">→</button></div></div><div id="results" class="results swipe-results"></div></div>
-          <div id="confirmation" class="confirmation hidden"></div>
         </div>
       </section>
       <section id="inventory-page" class="page hidden">
@@ -83,21 +82,21 @@ function addFiles(files) {
   const accepted = [...files].filter(f => ['image/jpeg','image/png','image/webp'].includes(f.type) && f.size <= 15_000_000);
   if(accepted.length < files.length) toast('Certains fichiers ont été ignorés (format ou taille).','error');
   const first = state.queue.length === 0;
-  state.queue.push(...accepted.map(file => ({file, url:URL.createObjectURL(file), name:'', number:'', total:'', visual:[], analyzed:false})));
+  state.queue.push(...accepted.map(file => ({file, url:URL.createObjectURL(file), name:'', number:'', total:'', price:'', visual:[], analyzed:false})));
   if(accepted.length) {$('#scan-workspace').classList.remove('hidden'); if(first) state.current=0; renderQueue(); if(first) analyzeCurrent();}
 }
 function currentItem(){return state.queue[state.current]}
-function saveInputs(){const item=currentItem(); if(!item)return; item.name=$('#search-name').value;item.number=$('#search-number').value;item.total=$('#search-total').value;}
+function saveInputs(){const item=currentItem(); if(!item)return; item.name=$('#search-name').value;item.number=$('#search-number').value;item.total=$('#search-total').value;item.price=$('#scan-price').value;}
 function renderQueue(){
   const item=currentItem(); if(!item) {$('#scan-workspace').classList.add('hidden');$('#scan-page').classList.remove('reviewing');document.body.classList.remove('scan-reviewing');return}
   $('#scan-page').classList.add('reviewing');document.body.classList.add('scan-reviewing');
   $('#queue-title').textContent=`${state.current+1} / ${state.queue.length}`;
   $('#queue-count').textContent=`${state.queue.length} photo${state.queue.length>1?'s':''} en attente`;
   $('#scan-image').src=item.url; $('#scan-file').textContent=item.file.name;
-  $('#search-name').value=item.name; $('#search-number').value=item.number; $('#search-total').value=item.total;
+  $('#search-name').value=item.name; $('#search-number').value=item.number; $('#search-total').value=item.total;$('#scan-price').value=item.price||'';
   $('#ocr-status').textContent=item.analyzed?'Lecture terminée · vérifiez les champs':'Prêt à analyser';
   $('#prev-scan').disabled=state.current===0; $('#next-scan').disabled=state.current===state.queue.length-1;
-  state.candidates=[];state.candidateIndex=0;state.selected=null;$('#results').innerHTML='';$('#confirmation').classList.add('hidden');
+  state.candidates=[];state.candidateIndex=0;state.selected=null;$('#results').innerHTML='';
 }
 $('#prev-scan').onclick=()=>{saveInputs();state.current--;renderQueue();if(currentItem().analyzed)findCards();else analyzeCurrent()};
 $('#next-scan').onclick=()=>{saveInputs();state.current++;renderQueue();if(currentItem().analyzed)findCards();else analyzeCurrent()};
@@ -126,33 +125,30 @@ async function findCards(){
 }
 $('#find-card').onclick=findCards;
 function renderCandidates(){
-  $('#confirmation').classList.add('hidden');state.selected=null;
+  state.selected=null;
   const shown=state.candidates.slice(0,3);
   const card=shown[state.candidateIndex];
   $('#results').innerHTML=shown.length&&card?`<div class="swipe-deck"><article class="swipe-card" id="swipe-card" aria-label="${esc(card.name)}, ${esc(card.set)} numéro ${esc(card.number)}"><div class="swipe-photo"><img src="${esc(card.image)}" alt="${esc(card.name)}, ${esc(card.set)}, numéro ${esc(card.number)}" draggable="false"></div><div class="swipe-card-info"><small>CARTE ${state.candidateIndex+1} / ${shown.length}</small><strong>${esc(card.name)}</strong><span>${esc(card.set)} · N° ${esc(card.number)}${card.set_total?' / '+card.set_total:''}</span></div><div class="swipe-stamp swipe-no-stamp">×</div><div class="swipe-stamp swipe-yes-stamp">✓</div></article><div class="swipe-actions"><button id="reject-candidate" class="swipe-no-button" type="button" aria-label="Passer cette proposition">×</button><button id="accept-candidate" class="swipe-yes-button" type="button" aria-label="Choisir cette carte">✓</button></div></div>`:shown.length?'<div class="swipe-finished">Plus de proposition. Corrige nom ou numéro pour relancer.</div>':'<div class="swipe-finished">Aucune carte trouvée. Corrige nom ou numéro pour relancer.</div>';
   $('#reject-candidate')?.addEventListener('click',rejectCandidate);
-  $('#accept-candidate')?.addEventListener('click',()=>selectCandidate(state.candidateIndex));
+  $('#accept-candidate')?.addEventListener('click',acceptCandidate);
   const swipeCard=$('#swipe-card');
-  if(swipeCard){let startX=null,deltaX=0;swipeCard.onpointerdown=event=>{startX=event.clientX;deltaX=0;swipeCard.setPointerCapture(event.pointerId);swipeCard.classList.add('dragging')};swipeCard.onpointermove=event=>{if(startX===null)return;deltaX=event.clientX-startX;swipeCard.style.transform=`translateX(${deltaX}px) rotate(${deltaX*.035}deg)`;swipeCard.classList.toggle('drag-left',deltaX< -24);swipeCard.classList.toggle('drag-right',deltaX>24)};const resetSwipe=()=>{startX=null;deltaX=0;swipeCard.style.transform='';swipeCard.classList.remove('dragging','drag-left','drag-right')};swipeCard.onpointerup=()=>{if(startX===null)return;const distance=deltaX;resetSwipe();if(distance>85)selectCandidate(state.candidateIndex);else if(distance< -85)rejectCandidate()};swipeCard.onpointercancel=resetSwipe}
+  if(swipeCard){let startX=null,deltaX=0;swipeCard.onpointerdown=event=>{startX=event.clientX;deltaX=0;swipeCard.setPointerCapture(event.pointerId);swipeCard.classList.add('dragging')};swipeCard.onpointermove=event=>{if(startX===null)return;deltaX=event.clientX-startX;swipeCard.style.transform=`translateX(${deltaX}px) rotate(${deltaX*.035}deg)`;swipeCard.classList.toggle('drag-left',deltaX< -24);swipeCard.classList.toggle('drag-right',deltaX>24)};const resetSwipe=()=>{startX=null;deltaX=0;swipeCard.style.transform='';swipeCard.classList.remove('dragging','drag-left','drag-right')};swipeCard.onpointerup=()=>{if(startX===null)return;const distance=deltaX;resetSwipe();if(distance>85)acceptCandidate();else if(distance< -85)rejectCandidate()};swipeCard.onpointercancel=resetSwipe}
 }
-function rejectCandidate(){if(state.candidateIndex>=Math.min(state.candidates.length,3))return;state.candidateIndex++;renderCandidates()}
-function selectCandidate(index){
-  state.selected=state.candidates[index];const c=state.selected;
-  document.querySelectorAll('.candidate').forEach((el,i)=>el.classList.toggle('chosen',i===index));
-  $('#confirmation').classList.remove('hidden');
-  $('#confirmation').innerHTML=`<div class="compact-confirm"><div class="confirm-card"><strong>${esc(c.name)}</strong><span>${esc(c.set)} · N° ${esc(c.number)}</span></div><label>Variante<select id="new-variant">${c.variants.map((v,i)=>`<option value="${i}">${esc(v.label)}</option>`).join('')}</select></label><label>État<select id="new-condition"><option>NM</option><option>MT</option><option>EX</option><option>GD</option><option>LP</option><option>PL</option><option>PO</option></select></label><label>Langue<select id="new-language"><option>FR</option><option>EN</option><option>DE</option><option>ES</option><option>IT</option><option>JP</option></select></label><label>Qté<input id="new-quantity" type="number" min="1" value="1"></label><label>Prix unitaire (€)<input id="new-price" type="number" min="0" step="0.01" placeholder="À définir"></label><button id="save-card" class="primary-button">Ajouter <span>↗</span></button></div>`;
-  c.cardmarketPromise=getCardmarketUrl(c.id,c).then(url=>{c.cardmarket_url=url;return url}).catch(()=>null);
-  $('#save-card').onclick=saveCard;$('#confirmation').scrollIntoView({behavior:'smooth',block:'start'});
+function rejectCandidate(){if(state.saving||state.candidateIndex>=Math.min(state.candidates.length,3))return;state.candidateIndex++;renderCandidates()}
+function acceptCandidate(){
+  if(state.saving)return;
+  const card=state.candidates[state.candidateIndex];if(!card)return;
+  state.selected=card;
+  card.cardmarketPromise=getCardmarketUrl(card.id,card).then(url=>{card.cardmarket_url=url;return url}).catch(()=>null);
+  saveCard();
 }
 async function saveCard(){
-  const c=state.selected,item=currentItem(),v=c.variants[Number($('#new-variant').value)];
-  const priceInput=$('#new-price').value;
-  if(priceInput!==''&&(!Number.isFinite(Number(priceInput))||Number(priceInput)<0)){toast('Saisissez un prix unitaire valide.','error');$('#new-price').focus();return}
-  $('#save-card').disabled=true;
-  const cardmarketUrl=await c.cardmarketPromise;
-  const payload={tcgdex_id:c.id,name:c.name,set_name:c.set,number:c.number,image_url:c.image,variant:v.label,price:priceInput===''?null:Number(priceInput),quantity:Number($('#new-quantity').value),condition:$('#new-condition').value,language:$('#new-language').value,cardmarket_url:cardmarketUrl,notes:''};
-  try{validateCardmarketUrl(payload.cardmarket_url);const result=await addCard(payload,item.file);toast(result.merged?`${c.name} regroupé · quantité totale : ${result.quantity}`:`${c.name} ajouté à l'inventaire`);URL.revokeObjectURL(item.url);state.queue.splice(state.current,1);state.current=Math.min(state.current,state.queue.length-1);renderQueue();if(state.queue.length)analyzeCurrent();loadCards();}
-  catch(e){toast(e.message,'error');$('#save-card').disabled=false}
+  const c=state.selected,item=currentItem(),v=c.variants?.[0]||{label:'Standard'};
+  const priceInput=$('#scan-price').value;
+  if(priceInput!==''&&(!Number.isFinite(Number(priceInput))||Number(priceInput)<0)){toast('Saisissez un prix unitaire valide.','error');$('#scan-price').focus();return}
+  state.saving=true;document.querySelectorAll('#accept-candidate,#reject-candidate').forEach(button=>button.disabled=true);
+  try{const cardmarketUrl=await c.cardmarketPromise;const payload={tcgdex_id:c.id,name:c.name,set_name:c.set,number:c.number,image_url:c.image,variant:v.label,price:priceInput===''?null:Number(priceInput),quantity:1,condition:'NM',language:'FR',cardmarket_url:cardmarketUrl,notes:''};validateCardmarketUrl(payload.cardmarket_url);const result=await addCard(payload,item.file);toast(result.merged?`${c.name} regroupé · quantité totale : ${result.quantity}`:`${c.name} ajouté à l'inventaire`);URL.revokeObjectURL(item.url);state.queue.splice(state.current,1);state.current=Math.min(state.current,state.queue.length-1);state.saving=false;renderQueue();if(state.queue.length)analyzeCurrent();loadCards();}
+  catch(e){toast(e.message,'error');state.saving=false;renderCandidates()}
 }
 
 async function loadCards(){

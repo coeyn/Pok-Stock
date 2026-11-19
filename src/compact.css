@@ -34,6 +34,10 @@ body.scan-reviewing .compact-page { max-width: 900px; padding: 10px 22px 24px; }
 .compact-page .recognition-fields label { gap: 3px; color: #879188; font-size: 9px; font-weight: 600; }
 .compact-page .recognition-fields input { min-height: 34px; padding: 6px 8px; font-size: 11px; }
 .compact-page .recognition .primary-button { width: auto; min-height: 34px; margin: 0; padding: 7px 13px; font-size: 11px; }
+.scan-price-control { margin-top: 6px; color: #879188; font-size: 9px; }
+.scan-price-control summary { display: inline-block; cursor: pointer; }
+.scan-price-control[open] { display: flex; align-items: center; gap: 8px; }
+.scan-price-control input { width: 110px; min-height: 30px; padding: 5px 7px; font-size: 10px; }
 .swipe-review { position: relative; width: 100%; max-width: 760px; min-height: 520px; margin: 0 auto; }
 .compact-page .scan-preview { position: absolute; z-index: 3; top: 24px; left: calc(50% - 258px); width: 78px; padding: 4px; border: 1px solid #fff; border-radius: 7px; background: #fff; box-shadow: 0 3px 14px #172c1e35; transform: rotate(-5deg); }
 .swipe-scan-label { display: none; }
@@ -62,24 +66,6 @@ body.scan-reviewing .compact-page { max-width: 900px; padding: 10px 22px 24px; }
 .swipe-no-button { color: #cb665b; }
 .swipe-yes-button { border-color: #2d6840 !important; background: #2d6840 !important; color: white; }
 .swipe-finished { display: grid; min-height: 410px; place-items: center; padding: 24px; color: #89948b; font-size: 12px; text-align: center; }
-.compact-page .confirmation { margin-top: 12px; padding: 13px; }
-.compact-confirm {
-  display: grid;
-  grid-template-columns: minmax(150px, 1.4fr) minmax(120px, 1fr) 75px 75px 64px 110px auto;
-  align-items: end;
-  gap: 10px;
-}
-.confirm-card { align-self: center; min-width: 0; }
-.confirm-card strong {
-  display: block;
-  overflow: hidden;
-  font: 600 16px Outfit;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.confirm-card span { display: block; margin-top: 3px; color: #829083; font-size: 10px; }
-.compact-confirm .primary-button { min-height: 39px; }
-
 .bulk-bar {
   display: flex;
   align-items: center;
@@ -149,8 +135,6 @@ body.scan-reviewing .compact-page { max-width: 900px; padding: 10px 22px 24px; }
   .compact-page .recognition .primary-button { grid-column: auto; }
   .swipe-review { min-height: 0; }
   .swipe-card { min-height: 0; }
-  .compact-confirm { grid-template-columns: repeat(3, 1fr); }
-  .confirm-card { grid-column: span 2; }
   .bulk-bar { flex-wrap: wrap; }
   .bulk-price { order: 3; width: 100%; margin-left: 0; }
   .extension-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -183,9 +167,6 @@ body.scan-reviewing .compact-page { max-width: 900px; padding: 10px 22px 24px; }
   .swipe-card-info > small { font-size: 8px; }
   .swipe-actions { gap: 18px; margin-top: 9px; }
   .swipe-actions button { width: 49px; height: 49px; font-size: 27px; }
-  .compact-confirm { grid-template-columns: repeat(2, 1fr); }
-  .confirm-card { grid-column: span 2; }
-  .compact-confirm .primary-button { width: 100%; }
   .bulk-price { flex-wrap: wrap; }
   .bulk-price .primary-button { flex: 1; }
   .extension-heading { align-items: flex-start; flex-direction: column; gap: 3px; }
