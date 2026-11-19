@@ -7,7 +7,7 @@ import './style.css';
 import './compact.css';
 
 const app = document.querySelector('#app');
-const state = { queue: [], current: 0, candidates: [], selected: null, selectedCards: new Set(), setFilter: null, scanSet: localStorage.getItem('scan-set') || '', scanSets: [], cards: [], worker: null, busy: false };
+const state = { queue: [], current: 0, candidates: [], candidateIndex: 0, selected: null, selectedCards: new Set(), setFilter: null, scanSet: localStorage.getItem('scan-set') || '', scanSets: [], cards: [], worker: null, busy: false };
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const euros = n => n == null ? '—' : new Intl.NumberFormat('fr-FR', {style:'currency', currency:'EUR'}).format(n);
@@ -31,9 +31,8 @@ app.innerHTML = `
         <div id="dropzone" class="dropzone compact-dropzone"><input id="file-input" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden><div class="upload-icon">↥</div><div><h2>Ajouter des scans</h2><p>Déposez ou choisissez plusieurs photos · JPG, PNG, WEBP</p></div></div>
         <div id="scan-workspace" class="scan-workspace hidden">
           <div class="workspace-head"><div><div class="eyebrow">EN COURS D'IDENTIFICATION</div><h2 id="queue-title">Carte 1</h2></div><div class="queue-actions"><span id="queue-count"></span><button id="clear-queue" class="text-button">Vider la file</button></div></div>
-          <div class="workspace-grid"><div class="scan-preview"><img id="scan-image" alt="Scan de la carte"><div class="scan-file" id="scan-file"></div><div class="queue-nav"><button id="prev-scan">← Précédente</button><button id="next-scan">Suivante →</button></div></div>
-            <div class="recognition"><div id="ocr-status" class="status-line">Prêt à analyser</div><div class="recognition-fields"><label>Nom<input id="search-name" placeholder="Pikachu"></label><label>Numéro<input id="search-number" placeholder="025"></label><label>Total<input id="search-total" inputmode="numeric" placeholder="102"></label><button id="find-card" class="primary-button">Rechercher <span>↗</span></button></div></div></div>
-          <div id="results" class="results"></div>
+          <div class="recognition"><div id="ocr-status" class="status-line">Prêt à analyser</div><div class="recognition-fields"><label>Nom<input id="search-name" placeholder="Pikachu"></label><label>Numéro<input id="search-number" placeholder="025"></label><label>Total<input id="search-total" inputmode="numeric" placeholder="102"></label><button id="find-card" class="primary-button">Rechercher <span>↗</span></button></div></div>
+          <div class="swipe-review"><div class="scan-preview"><span class="swipe-scan-label">TON SCAN</span><img id="scan-image" alt="Photo scannée de la carte"><div class="scan-file" id="scan-file"></div><div class="queue-nav"><button id="prev-scan">← Précédente</button><button id="next-scan">Suivante →</button></div></div><div id="results" class="results swipe-results"></div></div>
           <div id="confirmation" class="confirmation hidden"></div>
         </div>
       </section>
@@ -97,7 +96,7 @@ function renderQueue(){
   $('#search-name').value=item.name; $('#search-number').value=item.number; $('#search-total').value=item.total;
   $('#ocr-status').textContent=item.analyzed?'Lecture terminée · vérifiez les champs':'Prêt à analyser';
   $('#prev-scan').disabled=state.current===0; $('#next-scan').disabled=state.current===state.queue.length-1;
-  state.candidates=[];state.selected=null;$('#results').innerHTML='';$('#confirmation').classList.add('hidden');
+  state.candidates=[];state.candidateIndex=0;state.selected=null;$('#results').innerHTML='';$('#confirmation').classList.add('hidden');
 }
 $('#prev-scan').onclick=()=>{saveInputs();state.current--;renderQueue();if(currentItem().analyzed)findCards();else analyzeCurrent()};
 $('#next-scan').onclick=()=>{saveInputs();state.current++;renderQueue();if(currentItem().analyzed)findCards();else analyzeCurrent()};
@@ -120,7 +119,7 @@ async function findCards(){
   saveInputs();const item=currentItem();if(!item)return;
   if(!item.name&&!item.number&&!item.visual.length){toast('Saisissez un nom ou un numéro.','error');return}
   $('#find-card').disabled=true;$('#find-card').textContent='Recherche en cours…';
-  try {state.candidates=await searchCards({...item,setId:state.scanSet});renderCandidates();}
+  try {state.candidates=await searchCards({...item,setId:state.scanSet});state.candidateIndex=0;renderCandidates();}
   catch(e){toast(e.message,'error')}
   finally{$('#find-card').disabled=false;$('#find-card').innerHTML='Rechercher la carte <span>↗</span>'}
 }
@@ -128,10 +127,14 @@ $('#find-card').onclick=findCards;
 function renderCandidates(){
   $('#confirmation').classList.add('hidden');state.selected=null;
   const shown=state.candidates.slice(0,3);
-  $('#results').innerHTML=`<div class="section-title"><h3>Choisissez la bonne carte</h3><span>${shown.length} propositions</span></div>`+
-    (shown.length?`<div class="candidate-grid">${shown.map((c,i)=>`<button class="candidate" data-index="${i}"><img src="${esc(c.image)}" alt="" loading="lazy"><div><strong>${esc(c.name)}</strong><small>${esc(c.set)}</small><span>N° ${esc(c.number)}${c.set_total?' / '+c.set_total:''}</span></div><b>Choisir →</b></button>`).join('')}</div>`:'<div class="empty-result">Aucune correspondance. Corrigez le nom ou le numéro.</div>');
-  document.querySelectorAll('.candidate').forEach(el=>el.onclick=()=>selectCandidate(Number(el.dataset.index)));
+  const card=shown[state.candidateIndex];
+  $('#results').innerHTML=shown.length&&card?`<div class="swipe-deck"><div class="swipe-deck-heading"><div><span>PROPOSITION ${state.candidateIndex+1} / ${shown.length}</span><h3>Est-ce la bonne carte ?</h3></div><small>Glisse à gauche ou à droite</small></div><article class="swipe-card" id="swipe-card"><img src="${esc(card.image)}" alt="${esc(card.name)}, ${esc(card.set)}, numéro ${esc(card.number)}" draggable="false"><div class="swipe-card-info"><strong>${esc(card.name)}</strong><span>${esc(card.set)}</span><small>N° ${esc(card.number)}${card.set_total?' / '+card.set_total:''}</small></div><div class="swipe-stamp swipe-no-stamp">NON</div><div class="swipe-stamp swipe-yes-stamp">OUI</div></article><div class="swipe-actions"><button id="reject-candidate" class="swipe-no-button" type="button">← Non, suivante</button><button id="accept-candidate" class="swipe-yes-button" type="button">Oui, choisir →</button></div></div>`:shown.length?'<div class="swipe-finished">Tu as vu les 3 propositions. Corrige le nom ou le numéro puis relance la recherche.</div>':'<div class="swipe-finished">Aucune proposition trouvée. Corrige le nom ou le numéro puis relance la recherche.</div>';
+  $('#reject-candidate')?.addEventListener('click',rejectCandidate);
+  $('#accept-candidate')?.addEventListener('click',()=>selectCandidate(state.candidateIndex));
+  const swipeCard=$('#swipe-card');
+  if(swipeCard){let startX=null,deltaX=0;swipeCard.onpointerdown=event=>{startX=event.clientX;deltaX=0;swipeCard.setPointerCapture(event.pointerId);swipeCard.classList.add('dragging')};swipeCard.onpointermove=event=>{if(startX===null)return;deltaX=event.clientX-startX;swipeCard.style.transform=`translateX(${deltaX}px) rotate(${deltaX*.035}deg)`;swipeCard.classList.toggle('drag-left',deltaX< -24);swipeCard.classList.toggle('drag-right',deltaX>24)};const resetSwipe=()=>{startX=null;deltaX=0;swipeCard.style.transform='';swipeCard.classList.remove('dragging','drag-left','drag-right')};swipeCard.onpointerup=()=>{if(startX===null)return;const distance=deltaX;resetSwipe();if(distance>85)selectCandidate(state.candidateIndex);else if(distance< -85)rejectCandidate()};swipeCard.onpointercancel=resetSwipe}
 }
+function rejectCandidate(){if(state.candidateIndex>=Math.min(state.candidates.length,3))return;state.candidateIndex++;renderCandidates()}
 function selectCandidate(index){
   state.selected=state.candidates[index];const c=state.selected;
   document.querySelectorAll('.candidate').forEach((el,i)=>el.classList.toggle('chosen',i===index));

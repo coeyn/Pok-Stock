@@ -18,46 +18,46 @@
 .compact-page .scan-workspace { margin-top: 16px; padding: 18px; }
 .compact-page .workspace-head { margin-bottom: 14px; }
 .compact-page .workspace-head h2 { font-size: 18px; }
-.compact-page .workspace-grid { grid-template-columns: minmax(290px, 370px) minmax(0, 1fr); align-items: start; gap: 24px; }
-.compact-page .scan-preview { padding: 12px; }
-.compact-page .scan-preview > img { width: 100%; max-height: 500px; }
-.compact-page .scan-file { display: none; }
-.compact-page .queue-nav { margin-top: 9px; }
-.compact-page .recognition { padding-top: 0; }
+.compact-page .recognition { margin-bottom: 18px; }
 .compact-page .recognition-fields {
-  grid-template-columns: minmax(0, 1fr) 94px 94px auto;
+  grid-template-columns: minmax(180px, 1fr) 120px 120px auto;
   align-items: end;
-  gap: 9px;
+  gap: 12px;
 }
 .compact-page .recognition-fields label:first-child { grid-column: auto; }
 .compact-page .recognition .primary-button { width: auto; margin: 0; }
 .compact-page .status-line { margin-bottom: 12px; padding: 8px 10px; font-size: 10px; }
-.compact-page .results { margin-top: 18px; padding-top: 17px; }
-.compact-page .section-title { margin-bottom: 12px; }
-.compact-page .section-title h3 { font-size: 18px; }
-.compact-page .candidate-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 13px; }
-.compact-page .candidate {
-  display: flex;
-  min-height: 0;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0;
-  padding: 11px;
-  text-align: left;
-}
-.compact-page .candidate img {
-  width: 100%;
-  height: 290px;
-  flex: 0 0 auto;
-  border-radius: 7px;
-  background: #f2f5f1;
-  object-fit: contain;
-}
-.compact-page .candidate > div { min-width: 0; margin-top: 10px; padding-right: 0; }
-.compact-page .candidate div > strong { font-size: 15px; }
-.compact-page .candidate div > small { font-size: 10px; }
-.compact-page .candidate div > span { font-size: 10px; }
-.compact-page .candidate b { position: static; align-self: flex-end; margin-top: 9px; font-size: 10px; }
+.swipe-review { display: grid; grid-template-columns: 150px minmax(0, 1fr); align-items: start; gap: 22px; }
+.compact-page .scan-preview { padding: 10px; border: 1px solid #e4ebe2; background: #f7f9f6; }
+.swipe-scan-label { display: block; margin: 0 0 8px; color: #839185; font-size: 9px; font-weight: 800; letter-spacing: 1px; text-align: left; }
+.compact-page .scan-preview > img { display: block; width: 100%; max-height: 220px; border-radius: 5px; object-fit: contain; }
+.compact-page .scan-file { display: none; }
+.compact-page .queue-nav { margin-top: 8px; }
+.compact-page .queue-nav button { padding: 7px 5px; font-size: 9px; }
+.compact-page .swipe-results { min-width: 0; margin: 0; padding: 0; border: 0; }
+.swipe-deck { width: 100%; max-width: 700px; margin: 0 auto; }
+.swipe-deck-heading { display: flex; align-items: end; justify-content: space-between; gap: 12px; margin: 0 auto 11px; max-width: 620px; }
+.swipe-deck-heading > div > span { color: #6c986a; font-size: 9px; font-weight: 800; letter-spacing: 1.2px; }
+.swipe-deck-heading h3 { margin: 3px 0 0; font: 600 19px Outfit, sans-serif; }
+.swipe-deck-heading > small { color: #8b978d; font-size: 10px; }
+.swipe-card { position: relative; display: grid; grid-template-columns: minmax(240px, .9fr) 1fr; align-items: center; gap: 22px; width: 100%; max-width: 620px; min-height: 355px; margin: 0 auto; padding: 15px; overflow: hidden; border: 1px solid #e1e9df; border-radius: 14px; background: white; box-shadow: 0 8px 24px #17352110; touch-action: pan-y; user-select: none; transition: transform .16s ease, box-shadow .16s ease; cursor: grab; }
+.swipe-card.dragging { transition: none; cursor: grabbing; box-shadow: 0 16px 34px #17352124; }
+.swipe-card.drag-left { border-color: #d98b82; }
+.swipe-card.drag-right { border-color: #78ae77; }
+.swipe-card > img { display: block; width: 100%; height: 390px; border-radius: 9px; background: #f3f6f2; object-fit: contain; pointer-events: none; }
+.swipe-card-info { display: grid; gap: 7px; padding: 10px; }
+.swipe-card-info strong { color: #263a2d; font: 600 25px Outfit, sans-serif; }
+.swipe-card-info span { color: #647568; font-size: 13px; }
+.swipe-card-info small { color: #477d50; font-size: 12px; font-weight: 700; }
+.swipe-stamp { position: absolute; top: 26px; padding: 6px 12px; border: 3px solid; border-radius: 7px; font: 800 23px Outfit, sans-serif; opacity: 0; pointer-events: none; transform: rotate(-12deg); }
+.swipe-no-stamp { left: 26px; color: #ba5e54; border-color: #ba5e54; }
+.swipe-yes-stamp { right: 26px; color: #39834a; border-color: #39834a; transform: rotate(12deg); }
+.swipe-card.drag-left .swipe-no-stamp, .swipe-card.drag-right .swipe-yes-stamp { opacity: .95; }
+.swipe-actions { display: flex; justify-content: center; gap: 14px; margin: 13px auto 0; }
+.swipe-actions button { min-width: 145px; padding: 10px 16px; border: 1px solid #dce6db; border-radius: 999px; background: white; font-size: 12px; font-weight: 700; }
+.swipe-no-button { color: #8a554f; }
+.swipe-yes-button { border-color: #2d6840 !important; background: #2d6840 !important; color: white; }
+.swipe-finished { display: grid; min-height: 180px; place-items: center; padding: 24px; border: 1px dashed #dce6db; border-radius: 12px; color: #78857a; font-size: 13px; line-height: 1.6; text-align: center; }
 .compact-page .confirmation { margin-top: 12px; padding: 13px; }
 .compact-confirm {
   display: grid;
@@ -141,10 +141,11 @@
 .extension-option > strong { grid-column: 2; grid-row: 1 / span 2; color: #365e3c; font: 600 11px Outfit, sans-serif; white-space: nowrap; }
 
 @media (max-width: 1000px) {
-  .compact-page .workspace-grid { grid-template-columns: minmax(220px, .8fr) minmax(0, 1.2fr); gap: 16px; }
-  .compact-page .recognition-fields { grid-template-columns: minmax(0, 1fr) 74px 74px; }
-  .compact-page .recognition .primary-button { grid-column: 1 / -1; }
-  .compact-page .candidate img { height: 250px; }
+  .compact-page .recognition-fields { grid-template-columns: minmax(0, 1fr) 90px 90px auto; gap: 8px; }
+  .compact-page .recognition .primary-button { grid-column: auto; }
+  .swipe-review { grid-template-columns: 120px minmax(0, 1fr); gap: 14px; }
+  .swipe-card { grid-template-columns: minmax(190px, .9fr) 1fr; gap: 12px; min-height: 300px; }
+  .swipe-card > img { height: 330px; }
   .compact-confirm { grid-template-columns: repeat(3, 1fr); }
   .confirm-card { grid-column: span 2; }
   .bulk-bar { flex-wrap: wrap; }
@@ -159,16 +160,23 @@
   .scan-set-picker label, .scan-set-picker small { grid-column: 1; grid-row: auto; }
   .scan-set-picker input { width: 100%; }
   .compact-dropzone { min-height: 70px; padding: 12px; }
-  .compact-page .workspace-grid { grid-template-columns: 1fr; }
-  .compact-page .scan-preview > img { max-height: 500px; }
+  .swipe-review { grid-template-columns: 1fr; gap: 14px; }
+  .compact-page .scan-preview { display: grid; grid-template-columns: 76px 1fr; align-items: center; gap: 0 12px; padding: 8px; }
+  .swipe-scan-label { grid-column: 1 / -1; }
+  .compact-page .scan-preview > img { width: 76px; height: 104px; grid-column: 1; grid-row: 2 / span 2; }
+  .compact-page .queue-nav { grid-column: 2; grid-row: 2; align-self: end; margin: 0; }
+  .compact-page .scan-file { display: block; grid-column: 2; grid-row: 3; align-self: start; margin: 4px 0 0; text-align: left; }
   .compact-page .recognition-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .compact-page .recognition-fields label:first-child,
   .compact-page .recognition .primary-button { grid-column: 1 / -1; }
-  .compact-page .candidate-grid { grid-template-columns: 1fr; }
-  .compact-page .candidate { display: grid; grid-template-columns: minmax(135px, 42%) minmax(0, 1fr); align-items: center; gap: 0 12px; }
-  .compact-page .candidate img { grid-column: 1; grid-row: 1 / span 3; height: 230px; }
-  .compact-page .candidate > div { grid-column: 2; grid-row: 1; align-self: end; }
-  .compact-page .candidate b { grid-column: 2; grid-row: 2; align-self: start; justify-self: end; }
+  .compact-page .recognition-fields .primary-button { min-height: 39px; }
+  .swipe-deck-heading { align-items: start; flex-direction: column; gap: 2px; }
+  .swipe-card { grid-template-columns: 1fr; gap: 8px; min-height: 0; max-width: 390px; padding: 10px; }
+  .swipe-card > img { height: min(58vh, 390px); min-height: 245px; }
+  .swipe-card-info { gap: 4px; padding: 6px 8px; }
+  .swipe-card-info strong { font-size: 20px; }
+  .swipe-actions { gap: 8px; }
+  .swipe-actions button { min-width: 0; flex: 1; padding: 10px 8px; font-size: 11px; }
   .compact-confirm { grid-template-columns: repeat(2, 1fr); }
   .confirm-card { grid-column: span 2; }
   .compact-confirm .primary-button { width: 100%; }
