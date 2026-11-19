@@ -32,7 +32,7 @@ app.innerHTML = `
         <div id="scan-workspace" class="scan-workspace hidden">
           <div class="review-topbar"><span id="queue-title">1 / 1</span><span id="queue-count" class="visually-hidden"></span><button id="clear-queue" type="button" aria-label="Fermer le scanner">×</button></div>
           <div class="recognition"><div id="ocr-status" class="status-line">Lecture…</div><div class="recognition-fields"><label>Nom<input id="search-name" placeholder="Nom"></label><label>Numéro<input id="search-number" placeholder="N°"></label><label>Total<input id="search-total" inputmode="numeric" placeholder="Total"></label><button id="find-card" class="primary-button">Rechercher</button></div><details class="scan-price-control"><summary>€ Prix unitaire</summary><input id="scan-price" type="number" min="0" step="0.01" placeholder="À définir"></details></div>
-          <div class="swipe-review"><div class="scan-preview"><img id="scan-image" alt="Photo scannée de la carte"><div class="scan-file" id="scan-file"></div><div class="queue-nav"><button id="prev-scan" aria-label="Scan précédent">←</button><button id="next-scan" aria-label="Scan suivant">→</button></div></div><div id="results" class="results swipe-results"></div></div>
+          <div class="swipe-review"><div class="scan-preview"><button id="enlarge-scan" class="scan-thumb" type="button" aria-label="Agrandir le scan"><img id="scan-image" alt="Photo scannée de la carte"></button><div class="scan-file" id="scan-file"></div><div class="queue-nav"><button id="prev-scan" aria-label="Scan précédent">←</button><button id="next-scan" aria-label="Scan suivant">→</button></div></div><div id="results" class="results swipe-results"></div></div>
         </div>
       </section>
       <section id="inventory-page" class="page hidden">
@@ -45,6 +45,7 @@ app.innerHTML = `
       </section>
     </main>
   </div>
+  <dialog id="scan-image-dialog" class="scan-image-dialog"><button type="button" id="close-scan-image" aria-label="Fermer">×</button><img id="scan-image-full" alt="Scan agrandi de la carte"></dialog>
   <dialog id="edit-dialog"><form method="dialog" id="edit-form"><div class="dialog-head"><div><div class="eyebrow">MODIFIER LA FICHE</div><h2 id="edit-title"></h2></div><button type="button" id="close-dialog" class="icon-button">×</button></div><div class="form-grid"><label>Prix de vente (€)<input name="price" type="number" min="0" step="0.01" placeholder="À définir"></label><label>Quantité<input name="quantity" type="number" min="1" step="1"></label><label>État<select name="condition"><option>MT</option><option>NM</option><option>EX</option><option>GD</option><option>LP</option><option>PO</option></select></label><label>Langue<select name="language"><option>FR</option><option>EN</option><option>DE</option><option>ES</option><option>IT</option><option>JP</option></select></label><label class="wide">Variante<input name="variant"></label><label class="wide">Notes<textarea name="notes" rows="3" placeholder="Défauts, localisation, détails utiles…"></textarea></label></div><div class="dialog-actions"><button type="button" id="delete-card" class="danger-button">Supprimer</button><button type="submit" class="primary-button">Enregistrer</button></div></form></dialog>`;
 
 const $ = s => document.querySelector(s);
@@ -57,6 +58,9 @@ dropzone.ondragover = e => {e.preventDefault(); dropzone.classList.add('dragging
 dropzone.ondragleave = () => dropzone.classList.remove('dragging');
 dropzone.ondrop = e => {e.preventDefault(); dropzone.classList.remove('dragging'); addFiles(e.dataTransfer.files)};
 $('#file-input').onchange = e => {addFiles(e.target.files); e.target.value=''};
+$('#enlarge-scan').onclick=()=>{const item=currentItem();if(!item)return;$('#scan-image-full').src=item.url;$('#scan-image-dialog').showModal()};
+$('#close-scan-image').onclick=()=>$('#scan-image-dialog').close();
+$('#scan-image-dialog').onclick=e=>{if(e.target===$('#scan-image-dialog'))$('#scan-image-dialog').close()};
 
 async function loadScanSets(){
   const input=$('#scan-set'),status=$('#scan-set-status');
