@@ -30,9 +30,9 @@ app.innerHTML = `
         <div class="scan-set-picker"><label for="scan-set">Extension des cartes</label><input id="scan-set" list="scan-set-options" autocomplete="off" placeholder="Toutes les extensions"><datalist id="scan-set-options"><option value="Toutes les extensions"></option></datalist><small id="scan-set-status">Tapez le nom et choisissez une extension proposée pour filtrer les résultats.</small></div>
         <div id="dropzone" class="dropzone compact-dropzone"><input id="file-input" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden><div class="upload-icon">↥</div><div><h2>Ajouter des scans</h2><p>Déposez ou choisissez plusieurs photos · JPG, PNG, WEBP</p></div></div>
         <div id="scan-workspace" class="scan-workspace hidden">
-          <div class="workspace-head"><div><div class="eyebrow">EN COURS D'IDENTIFICATION</div><h2 id="queue-title">Carte 1</h2></div><div class="queue-actions"><span id="queue-count"></span><button id="clear-queue" class="text-button">Vider la file</button></div></div>
-          <div class="recognition"><div id="ocr-status" class="status-line">Prêt à analyser</div><div class="recognition-fields"><label>Nom<input id="search-name" placeholder="Pikachu"></label><label>Numéro<input id="search-number" placeholder="025"></label><label>Total<input id="search-total" inputmode="numeric" placeholder="102"></label><button id="find-card" class="primary-button">Rechercher <span>↗</span></button></div></div>
-          <div class="swipe-review"><div class="scan-preview"><span class="swipe-scan-label">TON SCAN</span><img id="scan-image" alt="Photo scannée de la carte"><div class="scan-file" id="scan-file"></div><div class="queue-nav"><button id="prev-scan">← Précédente</button><button id="next-scan">Suivante →</button></div></div><div id="results" class="results swipe-results"></div></div>
+          <div class="review-topbar"><span id="queue-title">1 / 1</span><span id="queue-count" class="visually-hidden"></span><button id="clear-queue" type="button" aria-label="Fermer le scanner">×</button></div>
+          <div class="recognition"><div id="ocr-status" class="status-line">Lecture…</div><div class="recognition-fields"><label>Nom<input id="search-name" placeholder="Nom"></label><label>Numéro<input id="search-number" placeholder="N°"></label><label>Total<input id="search-total" inputmode="numeric" placeholder="Total"></label><button id="find-card" class="primary-button">Rechercher</button></div></div>
+          <div class="swipe-review"><div class="scan-preview"><img id="scan-image" alt="Photo scannée de la carte"><div class="scan-file" id="scan-file"></div><div class="queue-nav"><button id="prev-scan" aria-label="Scan précédent">←</button><button id="next-scan" aria-label="Scan suivant">→</button></div></div><div id="results" class="results swipe-results"></div></div>
           <div id="confirmation" class="confirmation hidden"></div>
         </div>
       </section>
@@ -89,8 +89,9 @@ function addFiles(files) {
 function currentItem(){return state.queue[state.current]}
 function saveInputs(){const item=currentItem(); if(!item)return; item.name=$('#search-name').value;item.number=$('#search-number').value;item.total=$('#search-total').value;}
 function renderQueue(){
-  const item=currentItem(); if(!item) {$('#scan-workspace').classList.add('hidden');return}
-  $('#queue-title').textContent=`Carte ${state.current+1} sur ${state.queue.length}`;
+  const item=currentItem(); if(!item) {$('#scan-workspace').classList.add('hidden');$('#scan-page').classList.remove('reviewing');document.body.classList.remove('scan-reviewing');return}
+  $('#scan-page').classList.add('reviewing');document.body.classList.add('scan-reviewing');
+  $('#queue-title').textContent=`${state.current+1} / ${state.queue.length}`;
   $('#queue-count').textContent=`${state.queue.length} photo${state.queue.length>1?'s':''} en attente`;
   $('#scan-image').src=item.url; $('#scan-file').textContent=item.file.name;
   $('#search-name').value=item.name; $('#search-number').value=item.number; $('#search-total').value=item.total;
@@ -118,17 +119,17 @@ async function analyzeCurrent(){
 async function findCards(){
   saveInputs();const item=currentItem();if(!item)return;
   if(!item.name&&!item.number&&!item.visual.length){toast('Saisissez un nom ou un numéro.','error');return}
-  $('#find-card').disabled=true;$('#find-card').textContent='Recherche en cours…';
+  $('#find-card').disabled=true;$('#find-card').textContent='Recherche…';
   try {state.candidates=await searchCards({...item,setId:state.scanSet});state.candidateIndex=0;renderCandidates();}
   catch(e){toast(e.message,'error')}
-  finally{$('#find-card').disabled=false;$('#find-card').innerHTML='Rechercher la carte <span>↗</span>'}
+  finally{$('#find-card').disabled=false;$('#find-card').textContent='Rechercher'}
 }
 $('#find-card').onclick=findCards;
 function renderCandidates(){
   $('#confirmation').classList.add('hidden');state.selected=null;
   const shown=state.candidates.slice(0,3);
   const card=shown[state.candidateIndex];
-  $('#results').innerHTML=shown.length&&card?`<div class="swipe-deck"><div class="swipe-deck-heading"><div><span>PROPOSITION ${state.candidateIndex+1} / ${shown.length}</span><h3>Est-ce la bonne carte ?</h3></div><small>Glisse à gauche ou à droite</small></div><article class="swipe-card" id="swipe-card"><img src="${esc(card.image)}" alt="${esc(card.name)}, ${esc(card.set)}, numéro ${esc(card.number)}" draggable="false"><div class="swipe-card-info"><strong>${esc(card.name)}</strong><span>${esc(card.set)}</span><small>N° ${esc(card.number)}${card.set_total?' / '+card.set_total:''}</small></div><div class="swipe-stamp swipe-no-stamp">NON</div><div class="swipe-stamp swipe-yes-stamp">OUI</div></article><div class="swipe-actions"><button id="reject-candidate" class="swipe-no-button" type="button">← Non, suivante</button><button id="accept-candidate" class="swipe-yes-button" type="button">Oui, choisir →</button></div></div>`:shown.length?'<div class="swipe-finished">Tu as vu les 3 propositions. Corrige le nom ou le numéro puis relance la recherche.</div>':'<div class="swipe-finished">Aucune proposition trouvée. Corrige le nom ou le numéro puis relance la recherche.</div>';
+  $('#results').innerHTML=shown.length&&card?`<div class="swipe-deck"><article class="swipe-card" id="swipe-card" aria-label="${esc(card.name)}, ${esc(card.set)} numéro ${esc(card.number)}"><div class="swipe-photo"><img src="${esc(card.image)}" alt="${esc(card.name)}, ${esc(card.set)}, numéro ${esc(card.number)}" draggable="false"></div><div class="swipe-card-info"><small>CARTE ${state.candidateIndex+1} / ${shown.length}</small><strong>${esc(card.name)}</strong><span>${esc(card.set)} · N° ${esc(card.number)}${card.set_total?' / '+card.set_total:''}</span></div><div class="swipe-stamp swipe-no-stamp">×</div><div class="swipe-stamp swipe-yes-stamp">✓</div></article><div class="swipe-actions"><button id="reject-candidate" class="swipe-no-button" type="button" aria-label="Passer cette proposition">×</button><button id="accept-candidate" class="swipe-yes-button" type="button" aria-label="Choisir cette carte">✓</button></div></div>`:shown.length?'<div class="swipe-finished">Plus de proposition. Corrige nom ou numéro pour relancer.</div>':'<div class="swipe-finished">Aucune carte trouvée. Corrige nom ou numéro pour relancer.</div>';
   $('#reject-candidate')?.addEventListener('click',rejectCandidate);
   $('#accept-candidate')?.addEventListener('click',()=>selectCandidate(state.candidateIndex));
   const swipeCard=$('#swipe-card');
