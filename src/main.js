@@ -127,7 +127,7 @@ async function findCards(){
 $('#find-card').onclick=findCards;
 function renderCandidates(){
   $('#confirmation').classList.add('hidden');state.selected=null;
-  const shown=state.candidates.slice(0,6);
+  const shown=state.candidates.slice(0,3);
   $('#results').innerHTML=`<div class="section-title"><h3>Choisissez la bonne carte</h3><span>${shown.length} propositions</span></div>`+
     (shown.length?`<div class="candidate-grid">${shown.map((c,i)=>`<button class="candidate" data-index="${i}"><img src="${esc(c.image)}" alt="" loading="lazy"><div><strong>${esc(c.name)}</strong><small>${esc(c.set)}</small><span>N° ${esc(c.number)}${c.set_total?' / '+c.set_total:''}</span></div><b>Choisir →</b></button>`).join('')}</div>`:'<div class="empty-result">Aucune correspondance. Corrigez le nom ou le numéro.</div>');
   document.querySelectorAll('.candidate').forEach(el=>el.onclick=()=>selectCandidate(Number(el.dataset.index)));

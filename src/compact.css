@@ -18,23 +18,46 @@
 .compact-page .scan-workspace { margin-top: 16px; padding: 18px; }
 .compact-page .workspace-head { margin-bottom: 14px; }
 .compact-page .workspace-head h2 { font-size: 18px; }
-.compact-page .workspace-grid { grid-template-columns: minmax(170px, 230px) 1fr; gap: 18px; }
-.compact-page .scan-preview { padding: 10px; }
-.compact-page .scan-preview > img { max-height: 245px; }
-.compact-page .scan-file { margin: 6px 0; }
+.compact-page .workspace-grid { grid-template-columns: minmax(290px, 370px) minmax(0, 1fr); align-items: start; gap: 24px; }
+.compact-page .scan-preview { padding: 12px; }
+.compact-page .scan-preview > img { width: 100%; max-height: 500px; }
+.compact-page .scan-file { display: none; }
+.compact-page .queue-nav { margin-top: 9px; }
+.compact-page .recognition { padding-top: 0; }
 .compact-page .recognition-fields {
-  grid-template-columns: 2fr 1fr 1fr auto;
+  grid-template-columns: minmax(0, 1fr) 94px 94px auto;
   align-items: end;
-  gap: 10px;
+  gap: 9px;
 }
 .compact-page .recognition-fields label:first-child { grid-column: auto; }
 .compact-page .recognition .primary-button { width: auto; margin: 0; }
-.compact-page .status-line { margin-bottom: 12px; padding: 9px 11px; }
+.compact-page .status-line { margin-bottom: 12px; padding: 8px 10px; font-size: 10px; }
 .compact-page .results { margin-top: 18px; padding-top: 17px; }
 .compact-page .section-title { margin-bottom: 12px; }
 .compact-page .section-title h3 { font-size: 18px; }
-.compact-page .candidate { padding: 7px; }
-.compact-page .candidate img { width: 41px; height: 57px; }
+.compact-page .candidate-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 13px; }
+.compact-page .candidate {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  padding: 11px;
+  text-align: left;
+}
+.compact-page .candidate img {
+  width: 100%;
+  height: 290px;
+  flex: 0 0 auto;
+  border-radius: 7px;
+  background: #f2f5f1;
+  object-fit: contain;
+}
+.compact-page .candidate > div { min-width: 0; margin-top: 10px; padding-right: 0; }
+.compact-page .candidate div > strong { font-size: 15px; }
+.compact-page .candidate div > small { font-size: 10px; }
+.compact-page .candidate div > span { font-size: 10px; }
+.compact-page .candidate b { position: static; align-self: flex-end; margin-top: 9px; font-size: 10px; }
 .compact-page .confirmation { margin-top: 12px; padding: 13px; }
 .compact-confirm {
   display: grid;
@@ -118,7 +141,10 @@
 .extension-option > strong { grid-column: 2; grid-row: 1 / span 2; color: #365e3c; font: 600 11px Outfit, sans-serif; white-space: nowrap; }
 
 @media (max-width: 1000px) {
-  .compact-page .recognition-fields { grid-template-columns: 2fr 1fr; }
+  .compact-page .workspace-grid { grid-template-columns: minmax(220px, .8fr) minmax(0, 1.2fr); gap: 16px; }
+  .compact-page .recognition-fields { grid-template-columns: minmax(0, 1fr) 74px 74px; }
+  .compact-page .recognition .primary-button { grid-column: 1 / -1; }
+  .compact-page .candidate img { height: 250px; }
   .compact-confirm { grid-template-columns: repeat(3, 1fr); }
   .confirm-card { grid-column: span 2; }
   .bulk-bar { flex-wrap: wrap; }
@@ -134,8 +160,15 @@
   .scan-set-picker input { width: 100%; }
   .compact-dropzone { min-height: 70px; padding: 12px; }
   .compact-page .workspace-grid { grid-template-columns: 1fr; }
-  .compact-page .scan-preview > img { max-height: 215px; }
+  .compact-page .scan-preview > img { max-height: 500px; }
+  .compact-page .recognition-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .compact-page .recognition-fields label:first-child,
+  .compact-page .recognition .primary-button { grid-column: 1 / -1; }
   .compact-page .candidate-grid { grid-template-columns: 1fr; }
+  .compact-page .candidate { display: grid; grid-template-columns: minmax(135px, 42%) minmax(0, 1fr); align-items: center; gap: 0 12px; }
+  .compact-page .candidate img { grid-column: 1; grid-row: 1 / span 3; height: 230px; }
+  .compact-page .candidate > div { grid-column: 2; grid-row: 1; align-self: end; }
+  .compact-page .candidate b { grid-column: 2; grid-row: 2; align-self: start; justify-self: end; }
   .compact-confirm { grid-template-columns: repeat(2, 1fr); }
   .confirm-card { grid-column: span 2; }
   .compact-confirm .primary-button { width: 100%; }
